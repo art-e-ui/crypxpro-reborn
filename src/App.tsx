@@ -62,10 +62,10 @@ const App = () => (
               <Route path="futures" element={<Futures />} />
               <Route path="earn" element={<Earn />} />
               <Route path="assets" element={<Assets />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="terms" element={<Navigate to="/app/settings?tab=terms" replace />} />
-              <Route path="policies" element={<Navigate to="/app/settings?tab=policies" replace />} />
-              <Route path="faq" element={<Navigate to="/app/settings?tab=faq" replace />} />
+              <Route path="settings" element={<Navigate to="/app/home" replace />} />
+              <Route path="terms" element={<Navigate to="/app/home" replace />} />
+              <Route path="policies" element={<Navigate to="/app/home" replace />} />
+              <Route path="faq" element={<Navigate to="/app/home" replace />} />
               <Route path="admin" element={<Navigate to="/admin" replace />} />
             </Route>
 

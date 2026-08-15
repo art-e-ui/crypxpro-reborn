@@ -18,7 +18,6 @@ const MainLayout = () => {
     { icon: Zap, label: "Trade", path: "/app/trade-fi" },
     { icon: Gem, label: "Earn", path: "/app/earn" },
     { icon: Wallet, label: "Assets", path: "/app/assets" },
-    { icon: SettingsIcon, label: "Settings", path: "/app/settings" },
   ];
 
   const adminItem = { icon: ShieldAlert, label: "Admin", path: "/admin/dashboard" };

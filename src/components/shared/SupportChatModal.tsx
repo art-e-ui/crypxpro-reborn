@@ -169,10 +169,10 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
                 <HeadphonesIcon size={20} />
               </div>
               <div>
-                <h3 className="font-bold text-sm">Live Support</h3>
-                <div className="text-xs opacity-80 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                  We reply immediately
+                <h3 className="font-bold text-sm">CrypX-Pro Support</h3>
+                <div className="text-[11px] opacity-90 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>admin@crypxpro.com</span>
                 </div>
               </div>
             </div>
@@ -195,8 +195,11 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
           {/* Messages Area */}
           <div className="flex-1 p-4 overflow-y-auto bg-muted/30 space-y-4">
             <div className="flex justify-start">
-              <div className="max-w-[80%] bg-card text-foreground border border-border p-3 rounded-2xl rounded-tl-none shadow-sm">
-                <p className="text-sm">Hello! How can we help you today?</p>
+              <div className="max-w-[85%] bg-card text-foreground border border-border p-3 rounded-2xl rounded-tl-none shadow-sm space-y-1">
+                <p className="text-sm font-semibold">Welcome to CrypX-Pro Support</p>
+                <p className="text-xs text-muted-foreground">
+                  How can we assist you today? Inquiries are tracked in real-time or answered via our official desk at <span className="text-primary font-medium">admin@crypxpro.com</span>.
+                </p>
               </div>
             </div>
             

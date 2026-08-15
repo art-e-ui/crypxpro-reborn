@@ -1330,56 +1330,45 @@ const UserHome = () => {
             </div>
             <div className="p-6 space-y-3">
               <button 
-                onClick={() => {
-                  setActiveModal(null);
-                  navigate('/app/settings');
-                }} 
-                className="w-full flex items-center justify-between p-4 bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-2xl transition-all text-left group"
+                onClick={() => setActiveModal('TERMS')} 
+                className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-accent rounded-2xl transition-colors text-left group border border-border"
               >
                 <div className="flex items-center gap-3">
-                  <Settings size={20} className="text-primary" />
+                  <FileText size={18} className="text-primary" />
                   <div>
-                    <span className="font-bold text-foreground text-sm block">Full Settings Hub</span>
-                    <span className="text-[11px] text-muted-foreground">View all terms, user policies & FAQ</span>
+                    <span className="font-bold text-foreground text-sm block">Terms & Conditions</span>
+                    <span className="text-[11px] text-muted-foreground">Educational purpose & disclaimers</span>
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-primary group-hover:translate-x-1 transition-transform" />
+                <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform" />
               </button>
 
               <button 
-                onClick={() => setActiveModal('TERMS')} 
-                className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-accent rounded-xl transition-colors text-left group border border-border"
+                onClick={() => setActiveModal('POLICIES')} 
+                className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-accent rounded-2xl transition-colors text-left group border border-border"
               >
                 <div className="flex items-center gap-3">
-                  <FileText size={18} className="text-muted-foreground group-hover:text-primary" />
-                  <span className="font-bold text-foreground text-sm">Terms & Conditions</span>
+                  <Shield size={18} className="text-primary" />
+                  <div>
+                    <span className="font-bold text-foreground text-sm block">User Policies & Safeguards</span>
+                    <span className="text-[11px] text-muted-foreground">Developer & operator liability exemption</span>
+                  </div>
                 </div>
-                <ChevronRight size={16} className="text-muted-foreground" />
-              </button>
-
-              <button 
-                onClick={() => {
-                  setActiveModal(null);
-                  navigate('/app/settings?tab=policies');
-                }} 
-                className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-accent rounded-xl transition-colors text-left group border border-border"
-              >
-                <div className="flex items-center gap-3">
-                  <Shield size={18} className="text-muted-foreground group-hover:text-primary" />
-                  <span className="font-bold text-foreground text-sm">User Policies & Safeguards</span>
-                </div>
-                <ChevronRight size={16} className="text-muted-foreground" />
+                <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform" />
               </button>
 
               <button 
                 onClick={() => setActiveModal('FAQ')} 
-                className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-accent rounded-xl transition-colors text-left group border border-border"
+                className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-accent rounded-2xl transition-colors text-left group border border-border"
               >
                 <div className="flex items-center gap-3">
-                  <HeadphonesIcon size={18} className="text-muted-foreground group-hover:text-primary" />
-                  <span className="font-bold text-foreground text-sm">Feature FAQ</span>
+                  <HeadphonesIcon size={18} className="text-primary" />
+                  <div>
+                    <span className="font-bold text-foreground text-sm block">App Feature FAQ</span>
+                    <span className="text-[11px] text-muted-foreground">Spot, Futures, Earn & KYC explanations</span>
+                  </div>
                 </div>
-                <ChevronRight size={16} className="text-muted-foreground" />
+                <ChevronRight size={16} className="text-muted-foreground group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
           </div>
@@ -1400,53 +1389,101 @@ const UserHome = () => {
               </div>
               <button onClick={() => setActiveModal('SETTINGS')} className="text-muted-foreground hover:text-foreground"><X size={24} /></button>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-muted-foreground leading-relaxed">
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-muted-foreground leading-relaxed custom-scrollbar">
               <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs leading-relaxed">
                 <strong className="text-amber-300 block mb-1">Educational Sector & Demo Purpose:</strong>
-                CrypX-Pro is created exclusively for demo trading, market learning, and software evaluation purposes. It does not provide real financial services or live money transactions.
+                CrypX-Pro is created exclusively for demo trading, market learning, and software evaluation purposes. It does not provide real financial services, live money transactions, or financial advice.
               </div>
 
               <section>
-                <h4 className="font-bold text-foreground mb-2">1. Educational Purpose & Non-Financial Intent</h4>
+                <h4 className="font-bold text-foreground mb-1">1. Educational Purpose & Non-Financial Intent</h4>
                 <p>By accessing or using CrypX-Pro, you acknowledge that all trading features, spot balances, futures leverage, and yield returns are simulated paper credits designed strictly for learning and educational evaluation.</p>
               </section>
 
               <section>
-                <h4 className="font-bold text-foreground mb-2">2. Complete Exemption of Developer Liability</h4>
-                <p>The development team, software authors, and platform operators hold zero legal liability or responsibility for any user actions or decisions made after signing up or using this application.</p>
+                <h4 className="font-bold text-foreground mb-1">2. Complete Exemption of Developer Liability</h4>
+                <p>The development team, software authors, and platform operators hold zero legal liability or responsibility for any user actions, reliance on simulated data, or decisions made after signing up or using this application.</p>
               </section>
 
               <section>
-                <h4 className="font-bold text-foreground mb-2">3. Eligibility & Account Registration</h4>
+                <h4 className="font-bold text-foreground mb-1">3. Eligibility & Account Registration</h4>
                 <p>You must be at least 18 years old and capable of agreeing to software evaluation terms. Account data is maintained securely for testing and session state tracking.</p>
               </section>
 
               <section>
-                <h4 className="font-bold text-foreground mb-2">4. Trading Features & Yield Simulation</h4>
+                <h4 className="font-bold text-foreground mb-1">4. Trading Features & Yield Simulation</h4>
                 <p>CrypX-Pro provides simulated spot trading, futures leverage practice, and staking yield simulation. No real money deposits or guaranteed financial returns exist.</p>
               </section>
 
               <section>
-                <h4 className="font-bold text-foreground mb-2">5. Scamadviser & App Store Transparency</h4>
+                <h4 className="font-bold text-foreground mb-1">5. Scamadviser & App Store Transparency</h4>
                 <p>This app operates with full transparency. It does not engage in real financial solicitation, predatory trading schemes, or unauthorized asset management.</p>
               </section>
             </div>
 
-            <div className="p-4 border-t border-border flex justify-between items-center gap-3">
-              <button
-                onClick={() => {
-                  setActiveModal(null);
-                  navigate('/app/settings?tab=terms');
-                }}
-                className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
-              >
-                View Full Legal Page <ExternalLink size={12} />
-              </button>
+            <div className="p-4 border-t border-border flex justify-end items-center gap-3 shrink-0">
               <button
                 onClick={() => setActiveModal('SETTINGS')}
-                className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs"
+                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs"
               >
-                Done
+                Back to Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ USER POLICIES MODAL ============ */}
+      {activeModal === 'POLICIES' && (
+        <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="bg-card w-full max-w-lg rounded-[32px] max-h-[90vh] flex flex-col shadow-2xl animate-scale-in border border-border">
+            <div className="p-6 border-b border-border flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <Shield className="text-primary" size={24} />
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">User Policies & Safeguards</h3>
+                  <p className="text-xs text-muted-foreground">Privacy, Disclaimers & Developer Safeguards</p>
+                </div>
+              </div>
+              <button onClick={() => setActiveModal('SETTINGS')} className="text-muted-foreground hover:text-foreground"><X size={24} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 text-sm text-muted-foreground leading-relaxed custom-scrollbar">
+              <div className="p-4 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive-foreground space-y-1">
+                <h4 className="font-extrabold text-red-400 text-xs flex items-center gap-1.5 uppercase tracking-wider">
+                  Developer & Operator Exemption
+                </h4>
+                <p className="text-xs text-red-300/90 leading-relaxed">
+                  By registering or using CrypX-Pro, the user explicitly agrees that the software developers, authors, and operators bear NO liability or responsibility after sign-up. The app is not a financial institution or financial advisory service.
+                </p>
+              </div>
+
+              <section>
+                <h4 className="font-bold text-foreground mb-1">1. Educational Sector Intention</h4>
+                <p>This software is built for educational demonstration, user interface testing, and crypto mechanics education. No financial advisory or money management services are offered or implied.</p>
+              </section>
+
+              <section>
+                <h4 className="font-bold text-foreground mb-1">2. Privacy & Data Handling</h4>
+                <p>Account credentials (email, display name) are stored strictly for session management and demo profile state. Personal data is never sold to third parties.</p>
+              </section>
+
+              <section>
+                <h4 className="font-bold text-foreground mb-1">3. Simulated KYC Policy</h4>
+                <p>Uploaded documents in the identity verification section are handled in a sandbox environment to demonstrate compliance workflows for educational evaluation.</p>
+              </section>
+
+              <section>
+                <h4 className="font-bold text-foreground mb-1">4. Official Inquiries & Data Deletion</h4>
+                <p>Users may request account deletion or contact platform administration directly at <span className="text-foreground font-semibold">admin@crypxpro.com</span>. Official inquiries are handled within 24–48 hours.</p>
+              </section>
+            </div>
+
+            <div className="p-4 border-t border-border flex justify-end items-center shrink-0">
+              <button
+                onClick={() => setActiveModal('SETTINGS')}
+                className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs"
+              >
+                Back to Settings
               </button>
             </div>
           </div>
@@ -1476,7 +1513,7 @@ const UserHome = () => {
                 { q: 'What is staking?', a: 'Staking lets you earn passive rewards by locking your tokens for a set period. Visit the Earn page to explore available staking plans and their APY rates.' },
                 { q: 'How do I convert between tokens?', a: 'Use the Quick Convert feature on the Spot page. Select the token pair, enter the amount, and confirm the conversion. The exchange rate is calculated in real-time.' },
                 { q: 'Is my account secure?', a: 'Yes. We implement industry-standard security measures including encrypted data storage, secure authentication, and optional two-factor authentication (2FA). We recommend enabling 2FA for maximum security.' },
-                { q: 'How do I contact support?', a: 'Go to your Profile menu → Help & Support to access our 24/7 support team via Telegram, WhatsApp, or email.' },
+                { q: 'How do I contact support?', a: 'Go to your Profile menu → Help & Support or email our official desk directly at admin@crypxpro.com. Support tickets are reviewed within 24–48 hours.' },
                 { q: 'What fees does CrypX-Pro charge?', a: 'We charge competitive trading fees on spot and futures trades. Deposit fees depend on the blockchain network. Detailed fee information is available on the platform.' },
               ].map((faq, i) => (
                 <details key={i} className="group bg-muted/50 rounded-xl border border-border overflow-hidden">
@@ -1501,18 +1538,30 @@ const UserHome = () => {
               <HeadphonesIcon className="text-primary" size={24} />
               <div><h3 className="text-lg font-bold text-foreground">Customer Support</h3><p className="text-xs text-muted-foreground">We're here to help 24/7</p></div>
             </div>
-            <div className="bg-primary/5 rounded-xl p-8 text-center mb-6 border border-primary/10">
-              <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4"><HeadphonesIcon size={32} /></div>
-              <h4 className="font-bold text-foreground text-lg mb-2">Need Assistance?</h4>
-              <p className="text-sm text-muted-foreground leading-relaxed">Our support team is available around the clock.</p>
+            <div className="bg-primary/5 rounded-xl p-6 text-center mb-6 border border-primary/10">
+              <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-3"><HeadphonesIcon size={32} /></div>
+              <h4 className="font-bold text-foreground text-base mb-1">Official Support Center</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Our support team is available around the clock. Inquiries sent to our official channel are addressed promptly.
+              </p>
+              <div className="mt-3 py-2 px-3 rounded-lg bg-background border border-border/80 text-[11px] text-muted-foreground flex items-center justify-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Typical response time: within 24–48 hours</span>
+              </div>
             </div>
             {(!supportInfo || (!supportInfo.telegram && !supportInfo.whatsapp && !supportInfo.email)) ? (
-              <p className="text-sm text-muted-foreground text-center py-4 bg-muted/50 rounded-xl mb-6">No contact options available at the moment.</p>
+              <div className="space-y-3 mb-6">
+                <a href="mailto:admin@crypxpro.com" className="block w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl text-center shadow-brand text-xs">
+                  Email: admin@crypxpro.com
+                </a>
+              </div>
             ) : (
               <div className="space-y-3 mb-6">
-                {supportInfo.telegram && <a href={supportInfo.telegram} target="_blank" rel="noreferrer" className="block w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl text-center shadow-brand">Telegram Support</a>}
-                {supportInfo.whatsapp && <a href={supportInfo.whatsapp} target="_blank" rel="noreferrer" className="block w-full py-3 bg-green-500 text-white font-bold rounded-xl text-center">WhatsApp Support</a>}
-                {supportInfo.email && <a href={`mailto:${supportInfo.email}`} className="block w-full py-3 bg-card border border-border text-foreground font-bold rounded-xl text-center hover:bg-accent">Email Support</a>}
+                {supportInfo.telegram && <a href={supportInfo.telegram} target="_blank" rel="noreferrer" className="block w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl text-center shadow-brand text-xs">Telegram Support</a>}
+                {supportInfo.whatsapp && <a href={supportInfo.whatsapp} target="_blank" rel="noreferrer" className="block w-full py-3 bg-green-500 text-white font-bold rounded-xl text-center text-xs">WhatsApp Support</a>}
+                <a href={`mailto:${supportInfo.email || 'admin@crypxpro.com'}`} className="block w-full py-3 bg-card border border-border text-foreground font-bold rounded-xl text-center hover:bg-accent text-xs">
+                  Official Email: {supportInfo.email || 'admin@crypxpro.com'}
+                </a>
               </div>
             )}
             <div className="text-center">

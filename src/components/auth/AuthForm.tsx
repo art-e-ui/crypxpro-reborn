@@ -363,7 +363,7 @@ export const AuthForm = ({ onSuccess, isInsideModal = false }: AuthFormProps) =>
                 className="mt-0.5 w-4 h-4 rounded accent-primary border-border cursor-pointer shrink-0"
               />
               <label htmlFor="auth-terms-checkbox" className="text-muted-foreground cursor-pointer select-none leading-tight">
-                I do agree the{" "}
+                I do AGREE the{" "}
                 <button
                   type="button"
                   onClick={() => setShowTermsModal(true)}
@@ -371,7 +371,14 @@ export const AuthForm = ({ onSuccess, isInsideModal = false }: AuthFormProps) =>
                 >
                   terms & conditions
                 </button>
-                {" "}and educational disclaimer
+                {" "}and{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowTermsModal(true)}
+                  className="text-primary font-bold hover:underline"
+                >
+                  disclaimer
+                </button>
               </label>
             </div>
           )}
