@@ -54,7 +54,7 @@ const LEVERAGE_CONFIG: Record<number, { duration: number; profit: number }> = {
 };
 
 const Futures = () => {
-  const { user, profile: authProfile, refreshProfile } = useAuth();
+  const { user, profile: authProfile, refreshProfile, updateProfileLocally } = useAuth();
   const navigate = useNavigate();
   const profile = authProfile || getFallbackUserProfile(user);
   const [balanceHidden, setBalanceHidden] = useState(false);
@@ -99,7 +99,7 @@ const Futures = () => {
     try {
       supabase.from('positions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).then(({ data }) => {
         if (data) setPositions(data as FuturePosition[]);
-      });
+      }).catch(() => {});
     } catch (e) {
       console.warn("Error fetching positions", e);
     }
@@ -168,7 +168,7 @@ const Futures = () => {
         setPositions(updated);
         setTimeout(async () => {
           const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-          if (data) { setProfile(data as UserProfile); profileRef.current = data as UserProfile; }
+          if (data) { updateProfileLocally(data as UserProfile); profileRef.current = data as UserProfile; }
         }, 500);
       }
     }, 1000);

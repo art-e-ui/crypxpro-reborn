@@ -17,11 +17,14 @@ import {
   isPrimaryOwner,
   getUserPermission,
   getAdminIdForCurrentUser,
+  getReferralCodeForCurrentUser,
+  getAdminReferralCode,
   syncCustomAccountsWithSupabase,
   saveCustomAccountToSupabase,
   deleteCustomAccountFromSupabase,
   getUserReferrals,
   syncUserReferralsWithSupabase,
+  setReferrerForUser,
   UserReferral
 } from '@/lib/adminPermissions';
 
@@ -61,6 +64,32 @@ const AdminAdministrator = () => {
   const [referrals, setReferrals] = useState<UserReferral[]>([]);
   const [copied, setCopied] = useState(false);
   const [selectedAdminFilter, setSelectedAdminFilter] = useState<string>('all');
+
+  // Manual User Assignment State
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignUserEmail, setAssignUserEmail] = useState('');
+  const [assignAdminId, setAssignAdminId] = useState('CXPAD-002');
+  const [savingAssign, setSavingAssign] = useState(false);
+
+  const handleManualAssign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!assignUserEmail.trim()) {
+      toast.error("Please enter a valid user email.");
+      return;
+    }
+    setSavingAssign(true);
+    try {
+      setReferrerForUser(assignUserEmail.trim(), undefined, assignAdminId);
+      toast.success(`Successfully mapped ${assignUserEmail.trim()} to ${assignAdminId}`);
+      setAssignUserEmail('');
+      setShowAssignModal(false);
+      await loadReferrals();
+    } catch (err: any) {
+      toast.error('Failed to map user: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSavingAssign(false);
+    }
+  };
 
   const loadReferrals = useCallback(async () => {
     try {
@@ -155,24 +184,36 @@ const AdminAdministrator = () => {
           </div>
           
           {isOwner && (
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-black uppercase tracking-wider text-muted-foreground whitespace-nowrap">Filter Admin Group:</label>
-              <select
-                id="admin-filter-select"
-                value={selectedAdminFilter}
-                onChange={(e) => setSelectedAdminFilter(e.target.value)}
-                className="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(true)}
+                className="px-3.5 py-1.5 bg-primary text-primary-foreground text-xs font-black uppercase tracking-wider rounded-xl hover:bg-primary/90 transition-all flex items-center gap-1.5 shadow-sm shadow-primary/20"
               >
-                <option value="all">All Groups</option>
-                <option value="OWNER">Owner (OWNER)</option>
-                {Array.from(new Set(
-                  getCustomAccounts()
-                    .map(a => a.customId)
-                    .filter(Boolean)
-                )).map(id => (
-                  <option key={id} value={id}>{id}</option>
-                ))}
-              </select>
+                <UserPlus size={14} />
+                Assign User to Admin
+              </button>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-black uppercase tracking-wider text-muted-foreground whitespace-nowrap">Filter Group:</label>
+                <select
+                  id="admin-filter-select"
+                  value={selectedAdminFilter}
+                  onChange={(e) => setSelectedAdminFilter(e.target.value)}
+                  className="bg-muted border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                >
+                  <option value="all">All Groups</option>
+                  <option value="OWNER">Owner (OWNER)</option>
+                  {Array.from(new Set(
+                    getCustomAccounts()
+                      .map(a => a.customId)
+                      .filter(Boolean)
+                  )).map(id => (
+                    <option key={id} value={id}>
+                      {id} (Ref: {getAdminReferralCode(id)})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
         </div>
@@ -182,13 +223,18 @@ const AdminAdministrator = () => {
           <div className="lg:col-span-1 bg-muted/20 border border-border/80 p-5 rounded-2xl flex flex-col justify-between space-y-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Your Referral Group ID</span>
-                <span className="px-2.5 py-1 bg-primary/10 text-primary text-xs font-black font-mono rounded-lg border border-primary/20">
-                  {getAdminIdForCurrentUser(currentUserEmail) || (isOwner ? "OWNER" : "ADMIN")}
-                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Your Referral Code</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="px-2.5 py-1 bg-primary text-primary-foreground text-xs font-black font-mono rounded-lg shadow-sm shadow-primary/20">
+                    Code: {getReferralCodeForCurrentUser(currentUserEmail)}
+                  </span>
+                  <span className="px-2 py-1 bg-muted text-muted-foreground text-[10px] font-bold font-mono rounded-lg border border-border">
+                    {getAdminIdForCurrentUser(currentUserEmail) || (isOwner ? "OWNER" : "ADMIN")}
+                  </span>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground font-semibold leading-relaxed">
-                Provide this link to clients or customers. Any account created using this link will automatically map directly under your group panel for seamless management, deposit/withdrawal verification, and client support.
+                Provide your short referral link or code (<strong className="text-primary font-mono">{getReferralCodeForCurrentUser(currentUserEmail)}</strong>) to clients. Any account created using this link will automatically map directly under your group panel for seamless management, deposit/withdrawal verification, and client support.
               </p>
             </div>
 
@@ -198,17 +244,17 @@ const AdminAdministrator = () => {
                 <input
                   type="text"
                   readOnly
-                  value={`${window.location.origin.includes('crypxpro.com') ? 'https://crypxpro.com' : window.location.origin.replace('//admin.', '//')}/auth?ref=${getAdminIdForCurrentUser(currentUserEmail) || (isOwner ? "OWNER" : "ADMIN")}`}
+                  value={`${window.location.origin.includes('crypxpro.com') ? 'https://crypxpro.com' : window.location.origin.replace('//admin.', '//')}/auth?ref=${getReferralCodeForCurrentUser(currentUserEmail)}`}
                   className="flex-1 bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-muted-foreground font-mono focus:outline-none"
                 />
                 <button
                   id="copy-referral-link-btn"
                   onClick={() => {
                     const baseUrl = window.location.origin.includes('crypxpro.com') ? 'https://crypxpro.com' : window.location.origin.replace('//admin.', '//');
-                    const refLink = `${baseUrl}/auth?ref=${getAdminIdForCurrentUser(currentUserEmail) || (isOwner ? "OWNER" : "ADMIN")}`;
+                    const refLink = `${baseUrl}/auth?ref=${getReferralCodeForCurrentUser(currentUserEmail)}`;
                     navigator.clipboard.writeText(refLink);
                     setCopied(true);
-                    toast.success("Referral link copied!");
+                    toast.success(`Referral link copied! (Code: ${getReferralCodeForCurrentUser(currentUserEmail)})`);
                     setTimeout(() => setCopied(false), 2000);
                   }}
                   className={`p-2.5 rounded-xl border flex items-center justify-center transition-all active:scale-95 ${
@@ -293,6 +339,81 @@ const AdminAdministrator = () => {
           </div>
         </div>
       </div>
+      {/* Assign User to Admin Group Modal */}
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <form onSubmit={handleManualAssign} className="bg-card w-full max-w-md rounded-[28px] p-6 shadow-2xl relative border border-border animate-scale-in">
+            <button 
+              type="button" 
+              onClick={() => setShowAssignModal(false)} 
+              className="absolute right-4 top-4 p-2 hover:bg-muted rounded-full text-muted-foreground transition-colors"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center border border-primary/20">
+                <Users size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Assign User to Admin Group</h3>
+                <p className="text-xs text-muted-foreground">Map client to specific administrator management group</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-muted/40 border border-border/80 rounded-2xl mb-6 text-sm text-foreground/90 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">Registered Client Email</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="e.g. client@example.com"
+                  value={assignUserEmail}
+                  onChange={(e) => setAssignUserEmail(e.target.value)}
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">Target Admin Group</label>
+                <select
+                  value={assignAdminId}
+                  onChange={(e) => setAssignAdminId(e.target.value)}
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="OWNER">Owner (Unassigned / General)</option>
+                  <option value="CXPAD-002">admin2@crypxpro.com (CXPAD-002 | Ref: 2)</option>
+                  {getCustomAccounts()
+                    .filter(a => a.customId !== 'CXPAD-002')
+                    .map(acc => (
+                      <option key={acc.id} value={acc.customId}>
+                        {acc.email} ({acc.customId} | Ref: {getAdminReferralCode(acc)})
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(false)}
+                className="flex-1 py-3 border border-border rounded-xl text-foreground font-bold hover:bg-muted/80 transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingAssign}
+                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-colors text-sm shadow-brand flex items-center justify-center gap-2"
+              >
+                {savingAssign ? 'Mapping...' : 'Assign User'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

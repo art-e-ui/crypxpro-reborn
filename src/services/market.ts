@@ -104,17 +104,16 @@ const getWsDomain = () => {
   return detectedUsDomain ? 'stream.binance.us:9443' : 'stream.binance.com:9443';
 };
 
-const fetchBinance = async (endpoint: string, options?: any): Promise<Response> => {
+const fetchBinance = async (endpoint: string, options?: any): Promise<Response | null> => {
   const domains = detectedUsDomain 
     ? ['api.binance.us', 'api.binance.com'] 
     : ['api.binance.com', 'api.binance.us'];
     
-  let lastError: any = null;
   for (const domain of domains) {
     try {
       const url = `https://${domain}${endpoint}`;
       const response = await fetch(url, options);
-      if (response.ok) {
+      if (response && response.ok) {
         if (domain === 'api.binance.us' && !detectedUsDomain) {
           console.warn("Switched to Binance.US API for live open-source market prices.");
           detectedUsDomain = true;
@@ -126,11 +125,11 @@ const fetchBinance = async (endpoint: string, options?: any): Promise<Response> 
         }
         return response;
       }
-    } catch (err) {
-      lastError = err;
+    } catch {
+      // Ignore individual domain attempt errors
     }
   }
-  throw lastError || new Error("All Binance API endpoints failed");
+  return null;
 };
 
 // Fetch prices from open source backup (CoinCap API) if Binance is unreachable
@@ -183,7 +182,7 @@ const syncOpenSourcePrices = async () => {
       signal: controller.signal 
     }).finally(() => clearTimeout(timeoutId));
 
-    if (response.ok) {
+    if (response && response.ok) {
       const data = await response.json();
       if (Array.isArray(data)) {
         const liveUpdates: Record<string, { price: number; change24h: number; high24h?: number; low24h?: number; volume24h?: number }> = {};
@@ -412,7 +411,7 @@ export const marketService = {
         signal: controller.signal 
       }).finally(() => clearTimeout(timeoutId));
       
-      if (response.ok) {
+      if (response && response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
           data.forEach(item => {
@@ -481,7 +480,7 @@ export const marketService = {
         signal: controller.signal 
       }).finally(() => clearTimeout(timeoutId));
       
-      if (response.ok) {
+      if (response && response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
           data.forEach((item: { symbol: string; price: string }) => {
@@ -580,7 +579,7 @@ export const marketService = {
         signal: controller.signal 
       }).finally(() => clearTimeout(timeoutId));
       
-      if (response.ok) {
+      if (response && response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
           data.forEach((item: any) => {

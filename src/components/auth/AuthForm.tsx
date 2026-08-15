@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Eye, EyeOff, Mail, Lock, User, Loader2, FileText, X, Shield, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Logo } from "@/components/shared/Logo";
-import { isUserAdmin, syncAdminPermissions, getCustomAccounts, isPrimaryOwner, syncCustomAccountsWithSupabase } from "@/lib/adminPermissions";
+import { isUserAdmin, syncAdminPermissions, getCustomAccounts, isPrimaryOwner, syncCustomAccountsWithSupabase, normalizeAdminId } from "@/lib/adminPermissions";
 
 interface AuthFormProps {
   onSuccess?: () => void;
@@ -19,6 +19,7 @@ export const AuthForm = ({ onSuccess, isInsideModal = false }: AuthFormProps) =>
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -59,8 +60,16 @@ export const AuthForm = ({ onSuccess, isInsideModal = false }: AuthFormProps) =>
     }
 
     const searchParams = new URLSearchParams(search);
-    if (searchParams.has("ref")) {
+    const urlRef = searchParams.get("ref");
+    if (urlRef) {
       setIsLogin(false);
+      setReferralCode(urlRef);
+      localStorage.setItem('crypx_pending_ref_v1', urlRef);
+    } else {
+      const storedRef = localStorage.getItem('crypx_pending_ref_v1');
+      if (storedRef) {
+        setReferralCode(storedRef);
+      }
     }
 
     // Subscribe to password recovery session events
@@ -200,11 +209,17 @@ export const AuthForm = ({ onSuccess, isInsideModal = false }: AuthFormProps) =>
           throw new Error(authErrorMsg || "Invalid login credentials");
         }
       } else {
+        if (referralCode.trim()) {
+          localStorage.setItem('crypx_pending_ref_v1', referralCode.trim());
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: { display_name: displayName || "Crypto Trader" },
+            data: { 
+              display_name: displayName || "Crypto Trader",
+              referral_code: referralCode.trim() || undefined
+            },
             emailRedirectTo: window.location.origin,
           },
         });

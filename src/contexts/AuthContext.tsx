@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) {
         console.warn("Error fetching user profile from Supabase:", error);
         setProfile(prev => prev || fallback);
-        return prev || fallback;
+        return fallback;
       }
 
       if (data) {
@@ -126,7 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.warn("Exception in refreshProfile:", err);
       setProfile(prev => prev || fallback);
-      return prev || fallback;
+      return fallback;
     }
   }, [currentUser]);
 

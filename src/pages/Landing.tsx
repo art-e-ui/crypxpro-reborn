@@ -271,7 +271,7 @@ const Index = () => {
               <div className="mb-8 opacity-80">
                  <Logo size={62} variant="FULL" />
               </div>
-              <p className="text-muted-foreground max-w-sm text-xs font-light leading-loose">
+              <p className="text-muted-foreground max-w-sm text-xs font-light leading-loose mb-6">
                 CrypX-Pro provides institutional-grade digital asset infrastructure to professional traders, wealth managers, and corporate entities globally.
               </p>
             </div>

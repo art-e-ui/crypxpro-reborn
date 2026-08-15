@@ -25,7 +25,7 @@ const DEPOSIT_OPTIONS = [
 ];
 
 const Assets = () => {
-  const { user, profile: authProfile, refreshProfile } = useAuth();
+  const { user, profile: authProfile, refreshProfile, updateProfileLocally } = useAuth();
   const navigate = useNavigate();
   const profile = authProfile || getFallbackUserProfile(user);
   const [assets, setAssets] = useState<UserAsset[]>([]);
@@ -68,9 +68,27 @@ const Assets = () => {
   const loadData = useCallback(async () => {
     if (!user) return;
     refreshProfile();
+    let localCache: UserAsset[] = [];
+    const stored = localStorage.getItem(`user_assets_${user.id}`);
+    if (stored) {
+      try {
+        localCache = JSON.parse(stored);
+        if (Array.isArray(localCache) && localCache.length > 0) {
+          setAssets(localCache);
+        }
+      } catch (e) {
+        console.error("Failed to parse cached assets in Assets.tsx", e);
+      }
+    }
+
     try {
-      const { data } = await supabase.from('user_assets').select('*').eq('user_id', user.id);
-      if (data) setAssets(data as UserAsset[]);
+      const { data, error } = await supabase.from('user_assets').select('*').eq('user_id', user.id);
+      if (!error && data) {
+        setAssets(data as UserAsset[]);
+        localStorage.setItem(`user_assets_${user.id}`, JSON.stringify(data));
+      } else if (localCache.length > 0) {
+        setAssets(localCache);
+      }
     } catch (e) {
       console.warn("Could not fetch user assets", e);
     }
@@ -79,9 +97,9 @@ const Assets = () => {
   useEffect(() => {
     loadData();
     
-    marketService.getPrices().then(setPrices);
+    marketService.getPrices().then(setPrices).catch(() => {});
     const interval = setInterval(() => {
-      marketService.getPrices().then(setPrices);
+      marketService.getPrices().then(setPrices).catch(() => {});
     }, 3000);
 
     if (!user) return () => clearInterval(interval);
@@ -95,7 +113,7 @@ const Assets = () => {
         table: 'profiles', 
         filter: `id=eq.${user.id}` 
       }, () => {
-        refreshProfile();
+        refreshProfile().catch(() => {});
       })
       .subscribe();
 
@@ -110,7 +128,7 @@ const Assets = () => {
       }, () => {
         supabase.from('user_assets').select('*').eq('user_id', user.id).then(({ data }) => {
           if (data) setAssets(data as UserAsset[]);
-        });
+        }).catch(() => {});
       })
       .subscribe();
 
@@ -144,7 +162,8 @@ const Assets = () => {
         setDepositAddress(customAddress);
       } else {
         supabase.from('admin_wallets').select('address').eq('symbol', selectedToken.symbol).eq('network', selectedToken.network).single()
-          .then(({ data }) => setDepositAddress(data?.address || 'Address not configured'));
+          .then(({ data }) => setDepositAddress(data?.address || 'Address not configured'))
+          .catch(() => setDepositAddress('Address not configured'));
       }
     }
   }, [selectedToken, activeModal, user]);
@@ -217,7 +236,8 @@ const Assets = () => {
     let newSpot = profile.balance || 0, newFutures = profile.futures_balance || 0;
     if (transferFrom === 'Spot') { newSpot -= val; newFutures += val; } else { newFutures -= val; newSpot += val; }
     await supabase.from('profiles').update({ balance: newSpot, futures_balance: newFutures }).eq('id', user.id);
-    setProfile({ ...profile, balance: newSpot, futures_balance: newFutures });
+    updateProfileLocally({ balance: newSpot, futures_balance: newFutures });
+    refreshProfile();
     setIsTransferring(false);
     setActiveModal(null);
     setTransferAmount('');
@@ -255,7 +275,8 @@ const Assets = () => {
     if (withdrawToken === 'USDT') {
       const newBal = (profile.balance || 0) - amt;
       await supabase.from('profiles').update({ balance: newBal }).eq('id', user.id);
-      setProfile({ ...profile, balance: newBal });
+      updateProfileLocally({ balance: newBal });
+      refreshProfile();
     } else {
       const a = assets.find(x => x.symbol === withdrawToken);
       if (a) {

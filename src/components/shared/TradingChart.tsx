@@ -90,6 +90,8 @@ const TradingChart = ({ symbol, pair, className = "h-64", theme, interval = '1h'
         }
         setLoading(false);
       }
+    }).catch(() => {
+      if (isMounted) setLoading(false);
     });
 
     const unsubscribe = marketService.subscribeToTicker(activePair, (priceValue) => {

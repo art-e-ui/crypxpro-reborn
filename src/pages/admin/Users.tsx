@@ -3,14 +3,23 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, RefreshCw, Users as UsersIcon, ArrowUp, ArrowDown, 
   Settings, AlertCircle, Bell, X, Coins,
-  Activity, Globe, Laptop, Smartphone, Terminal, History, ShieldCheck, UserCheck, Trash2
+  Activity, Globe, Laptop, Smartphone, Terminal, History, ShieldCheck, UserCheck, Trash2, Link2, Shield
 } from 'lucide-react';
 import CubeSpinner from '@/components/shared/CubeSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { marketService } from '@/services/market';
 import type { UserAsset } from '@/types';
-import { getAdminIdForCurrentUser, filterUsersByAdminGroup, syncUserReferralsWithSupabase } from '@/lib/adminPermissions';
+import { 
+  getAdminIdForCurrentUser, 
+  filterUsersByAdminGroup, 
+  syncUserReferralsWithSupabase,
+  getReferrerForUser,
+  setReferrerForUser,
+  getCustomAccounts,
+  getAdminReferralCode,
+  isPrimaryOwner
+} from '@/lib/adminPermissions';
 
 interface ProfileRow {
   id: string;
@@ -201,6 +210,29 @@ const AdminUsers = () => {
   // Developer User Deletion State
   const [selectedUserForDelete, setSelectedUserForDelete] = useState<ProfileRow | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
+
+  // Admin Group Assignment State
+  const [selectedUserForAdminAssign, setSelectedUserForAdminAssign] = useState<ProfileRow | null>(null);
+  const [targetAdminId, setTargetAdminId] = useState<string>('CXPAD-002');
+  const [savingAdminAssign, setSavingAdminAssign] = useState(false);
+  const isOwner = isPrimaryOwner(currentUser?.email);
+
+  const handleAssignUserAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserForAdminAssign || !selectedUserForAdminAssign.email) return;
+    
+    setSavingAdminAssign(true);
+    try {
+      setReferrerForUser(selectedUserForAdminAssign.email, selectedUserForAdminAssign.id, targetAdminId);
+      toast.success(`User ${selectedUserForAdminAssign.email} mapped to ${targetAdminId}!`);
+      setSelectedUserForAdminAssign(null);
+      await loadUsers(true);
+    } catch (err: any) {
+      toast.error('Failed to assign admin: ' + (err.message || 'Unknown error'));
+    } finally {
+      setSavingAdminAssign(false);
+    }
+  };
 
   const handleDeleteUser = async () => {
     if (!selectedUserForDelete) return;
@@ -547,6 +579,7 @@ const AdminUsers = () => {
                       {[
                         { label: 'User Details', field: 'name' as SortField },
                         { label: 'User ID', field: null },
+                        { label: 'Admin Group', field: null },
                         { label: 'Net Worth', field: 'total_value' as SortField },
                         { label: 'KYC', field: 'kyc' as SortField },
                         { label: 'Joined', field: 'joined' as SortField },
@@ -566,7 +599,9 @@ const AdminUsers = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {paginated.map(user => (
+                    {paginated.map(user => {
+                      const userReferrer = getReferrerForUser(user.email || undefined, user.id);
+                      return (
                       <tr key={user.id} className="hover:bg-muted/30 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -580,6 +615,26 @@ const AdminUsers = () => {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm font-mono text-muted-foreground">{user.ftid || '—'}</td>
+                        <td className="px-6 py-4">
+                          {isOwner ? (
+                            <button
+                              onClick={() => {
+                                setSelectedUserForAdminAssign(user);
+                                setTargetAdminId(userReferrer || 'CXPAD-002');
+                              }}
+                              className="px-2.5 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-colors"
+                              title="Click to change Admin Group"
+                            >
+                              <Shield size={12} />
+                              {userReferrer ? `${userReferrer} (Ref: ${getAdminReferralCode(userReferrer)})` : 'OWNER'}
+                            </button>
+                          ) : (
+                            <span className="px-2.5 py-1 bg-muted text-muted-foreground border border-border rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 w-fit">
+                              <Shield size={12} />
+                              {userReferrer ? `${userReferrer} (Ref: ${getAdminReferralCode(userReferrer)})` : 'DEFAULT'}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="text-sm font-bold text-foreground font-mono">${(user.total_value ?? user.balance ?? 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</div>
                           <div className="text-[10px] text-muted-foreground font-bold flex gap-1 items-center">
@@ -613,6 +668,18 @@ const AdminUsers = () => {
                               </button>
                             </>
                           )}
+                          {isOwner && (
+                            <button
+                              onClick={() => {
+                                setSelectedUserForAdminAssign(user);
+                                setTargetAdminId(userReferrer || 'CXPAD-002');
+                              }}
+                              className="text-muted-foreground hover:text-primary transition-colors p-2 hover:bg-accent rounded-full"
+                              title="Assign/Reassign Admin Group"
+                            >
+                              <Link2 size={16} />
+                            </button>
+                          )}
                           <button 
                             onClick={() => setSelectedUserForNotice(user)}
                             className="text-muted-foreground hover:text-primary transition-colors p-2 hover:bg-accent rounded-full"
@@ -622,7 +689,8 @@ const AdminUsers = () => {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               )}
@@ -829,6 +897,81 @@ const AdminUsers = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Admin Group Assignment Modal */}
+      {selectedUserForAdminAssign && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <form onSubmit={handleAssignUserAdmin} className="bg-card w-full max-w-md rounded-[28px] p-6 shadow-2xl relative border border-border animate-scale-in">
+            <button 
+              type="button" 
+              onClick={() => setSelectedUserForAdminAssign(null)} 
+              className="absolute right-4 top-4 p-2 hover:bg-muted rounded-full text-muted-foreground transition-colors"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center border border-primary/20">
+                <Shield size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Assign Admin Group</h3>
+                <p className="text-xs text-muted-foreground">Map client to specific administrator management panel</p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-muted/40 border border-border/80 rounded-2xl mb-6 text-sm text-foreground/90 space-y-3">
+              <div className="font-mono text-xs space-y-1">
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Client:</span>
+                  <span className="font-bold text-foreground">{selectedUserForAdminAssign.username || 'User'}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Email:</span>
+                  <span className="font-bold text-foreground">{selectedUserForAdminAssign.email}</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-border/60">
+                <label className="block text-xs font-bold text-foreground mb-1.5">Select Designated Admin Group</label>
+                <select
+                  value={targetAdminId}
+                  onChange={(e) => setTargetAdminId(e.target.value)}
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="OWNER">Owner (Unassigned / General)</option>
+                  <option value="CXPAD-002">admin2@crypxpro.com (CXPAD-002 | Ref: 2)</option>
+                  {getCustomAccounts()
+                    .filter(a => a.customId !== 'CXPAD-002')
+                    .map(acc => (
+                      <option key={acc.id} value={acc.customId}>
+                        {acc.email} ({acc.customId} | Ref: {getAdminReferralCode(acc)})
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedUserForAdminAssign(null)}
+                className="flex-1 py-3 border border-border rounded-xl text-foreground font-bold hover:bg-muted/80 transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingAdminAssign}
+                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-colors text-sm shadow-brand flex items-center justify-center gap-2"
+              >
+                {savingAdminAssign ? 'Saving...' : 'Save Mapping'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

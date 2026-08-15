@@ -192,7 +192,7 @@ const ALL_ASSETS = [
 ];
 
 const Spot = () => {
-  const { user, profile: authProfile, refreshProfile } = useAuth();
+  const { user, profile: authProfile, refreshProfile, updateProfileLocally } = useAuth();
   const navigate = useNavigate();
   const profile = authProfile || getFallbackUserProfile(user);
   const [userAssets, setUserAssets] = useState<UserAsset[]>([]);
@@ -232,12 +232,12 @@ const Spot = () => {
   }, [user]);
 
   // Save orders helper
-  const saveSpotOrders = (newOrders: SpotOrder[]) => {
+  const saveSpotOrders = useCallback((newOrders: SpotOrder[]) => {
     setSpotOrders(newOrders);
     if (user) {
       localStorage.setItem(`spot_orders_${user.id}`, JSON.stringify(newOrders));
     }
-  };
+  }, [user]);
 
   const loadProfile = useCallback(async () => {
     if (!user) return;
@@ -246,9 +246,27 @@ const Spot = () => {
 
   const loadAssets = useCallback(async () => {
     if (!user) return;
+    let localCache: UserAsset[] = [];
+    const stored = localStorage.getItem(`user_assets_${user.id}`);
+    if (stored) {
+      try {
+        localCache = JSON.parse(stored);
+        if (Array.isArray(localCache) && localCache.length > 0) {
+          setUserAssets(localCache);
+        }
+      } catch (e) {
+        console.error("Failed to parse cached assets", e);
+      }
+    }
+
     try {
-      const { data } = await supabase.from('user_assets').select('*').eq('user_id', user.id);
-      if (data) setUserAssets(data as UserAsset[]);
+      const { data, error } = await supabase.from('user_assets').select('*').eq('user_id', user.id);
+      if (!error && data) {
+        setUserAssets(data as UserAsset[]);
+        localStorage.setItem(`user_assets_${user.id}`, JSON.stringify(data));
+      } else if (localCache.length > 0) {
+        setUserAssets(localCache);
+      }
     } catch (e) {
       console.warn("Could not load user assets", e);
     }
@@ -330,6 +348,78 @@ const Spot = () => {
     };
   }, [user, loadProfile, loadAssets]);
 
+  // Automated Live Limit Order Matching Engine
+  useEffect(() => {
+    if (!user || spotOrders.length === 0) return;
+    const openOrders = spotOrders.filter(o => o.status === 'OPEN');
+    if (openOrders.length === 0) return;
+
+    let ordersChanged = false;
+    const updatedOrders = [...spotOrders];
+
+    for (let i = 0; i < updatedOrders.length; i++) {
+      const order = updatedOrders[i];
+      if (order.status !== 'OPEN') continue;
+
+      const liveTicker = tickers[order.pair];
+      const livePrice = liveTicker?.lastPrice || marketService.getCurrentPrice(order.pair);
+      if (!livePrice || livePrice <= 0) continue;
+
+      // Limit Buy condition: Market price is at or below the limit order price
+      if (order.side === 'BUY' && livePrice <= order.price) {
+        ordersChanged = true;
+        updatedOrders[i] = {
+          ...order,
+          status: 'FILLED',
+          filledAt: new Date().toISOString()
+        };
+
+        // Credit the base asset to user
+        const existingAssetIndex = userAssets.findIndex(a => a.symbol === order.symbol);
+        let nextAssets: UserAsset[];
+        if (existingAssetIndex >= 0) {
+          const existing = userAssets[existingAssetIndex];
+          const newAmt = Number((Number(existing.amount) + order.amount).toFixed(8));
+          nextAssets = userAssets.map((a, idx) => idx === existingAssetIndex ? { ...a, amount: newAmt } : a);
+          supabase.from('user_assets').update({ amount: newAmt }).eq('id', existing.id);
+        } else {
+          const newAssetItem: UserAsset = {
+            id: 'asset_' + Math.random().toString(36).substring(2, 9),
+            user_id: user.id,
+            symbol: order.symbol,
+            amount: Number(order.amount.toFixed(8)),
+            created_at: new Date().toISOString()
+          };
+          nextAssets = [...userAssets, newAssetItem];
+          supabase.from('user_assets').insert({ user_id: user.id, symbol: order.symbol, amount: Number(order.amount.toFixed(8)) });
+        }
+        setUserAssets(nextAssets);
+        localStorage.setItem(`user_assets_${user.id}`, JSON.stringify(nextAssets));
+        toast.success(`🎉 Limit Buy Order Filled: Bought ${order.amount.toFixed(4)} ${order.symbol} @ $${livePrice.toFixed(2)}`);
+      }
+
+      // Limit Sell condition: Market price is at or above the limit order price
+      if (order.side === 'SELL' && livePrice >= order.price) {
+        ordersChanged = true;
+        updatedOrders[i] = {
+          ...order,
+          status: 'FILLED',
+          filledAt: new Date().toISOString()
+        };
+
+        // Credit USDT to user profile
+        const newUsdt = (profile?.balance || 0) + order.total;
+        supabase.from('profiles').update({ balance: newUsdt }).eq('id', user.id);
+        updateProfileLocally({ balance: newUsdt });
+        toast.success(`🎉 Limit Sell Order Filled: Sold ${order.amount.toFixed(4)} ${order.symbol} for $${order.total.toFixed(2)} USDT`);
+      }
+    }
+
+    if (ordersChanged) {
+      saveSpotOrders(updatedOrders);
+    }
+  }, [tickers, spotOrders, user, profile, userAssets, updateProfileLocally, saveSpotOrders]);
+
   // Execute Spot Trade (Buy / Sell)
   const handleExecuteTrade = async ({
     side,
@@ -362,17 +452,32 @@ const Spot = () => {
       // Deduct USDT balance
       const newUsdtBalance = Math.max(0, currentUsdt - total);
       await supabase.from('profiles').update({ balance: newUsdtBalance }).eq('id', user.id);
-      setProfile(prev => prev ? { ...prev, balance: newUsdtBalance } : prev);
+      updateProfileLocally({ balance: newUsdtBalance });
 
       if (type === 'MARKET') {
-        // Credit Base Asset immediately
-        const existingAsset = userAssets.find(a => a.symbol === baseSymbol);
-        if (existingAsset) {
-          const newAmt = existingAsset.amount + amount;
-          await supabase.from('user_assets').update({ amount: newAmt }).eq('id', existingAsset.id);
+        // Credit Base Asset immediately for Market Order at Mark Price
+        const existingAssetIndex = userAssets.findIndex(a => a.symbol === baseSymbol);
+        let updatedAssets: UserAsset[];
+
+        if (existingAssetIndex >= 0) {
+          const existing = userAssets[existingAssetIndex];
+          const newAmt = Number((Number(existing.amount) + amount).toFixed(8));
+          updatedAssets = userAssets.map((a, idx) => idx === existingAssetIndex ? { ...a, amount: newAmt } : a);
+          await supabase.from('user_assets').update({ amount: newAmt }).eq('id', existing.id);
         } else {
-          await supabase.from('user_assets').insert({ user_id: user.id, symbol: baseSymbol, amount });
+          const newAssetItem: UserAsset = {
+            id: 'asset_' + Math.random().toString(36).substring(2, 9),
+            user_id: user.id,
+            symbol: baseSymbol,
+            amount: Number(amount.toFixed(8)),
+            created_at: new Date().toISOString()
+          };
+          updatedAssets = [...userAssets, newAssetItem];
+          await supabase.from('user_assets').insert({ user_id: user.id, symbol: baseSymbol, amount: Number(amount.toFixed(8)) });
         }
+
+        setUserAssets(updatedAssets);
+        localStorage.setItem(`user_assets_${user.id}`, JSON.stringify(updatedAssets));
       }
 
       // Record Order
@@ -394,8 +499,8 @@ const Spot = () => {
       saveSpotOrders([newOrder, ...spotOrders]);
       toast.success(
         type === 'MARKET'
-          ? `Bought ${amount.toFixed(4)} ${baseSymbol} @ $${price.toFixed(2)}`
-          : `Limit Buy Order placed for ${amount.toFixed(4)} ${baseSymbol} @ $${price.toFixed(2)}`
+          ? `Bought ${amount.toFixed(4)} ${baseSymbol} @ Mark Price $${price.toLocaleString(undefined, { minimumFractionDigits: 2 })} USDT`
+          : `Limit Buy Order placed for ${amount.toFixed(4)} ${baseSymbol} @ $${price.toLocaleString(undefined, { minimumFractionDigits: 2 })} (Placed in Open Orders)`
       );
 
     } else {
@@ -410,19 +515,28 @@ const Spot = () => {
 
       // Deduct Base Asset
       const newBaseAmt = Math.max(0, currentBaseAmt - amount);
+      let updatedAssets: UserAsset[];
+
       if (newBaseAmt < 0.000001) {
+        updatedAssets = userAssets.filter(a => a.symbol !== baseSymbol);
         if (existingAsset) {
           await supabase.from('user_assets').delete().eq('id', existingAsset.id);
         }
       } else if (existingAsset) {
+        updatedAssets = userAssets.map(a => a.id === existingAsset.id ? { ...a, amount: newBaseAmt } : a);
         await supabase.from('user_assets').update({ amount: newBaseAmt }).eq('id', existingAsset.id);
+      } else {
+        updatedAssets = userAssets;
       }
 
+      setUserAssets(updatedAssets);
+      localStorage.setItem(`user_assets_${user.id}`, JSON.stringify(updatedAssets));
+
       if (type === 'MARKET') {
-        // Credit USDT immediately
+        // Credit USDT immediately for Market Sell at Mark Price
         const newUsdtBalance = (profile.balance || 0) + total;
         await supabase.from('profiles').update({ balance: newUsdtBalance }).eq('id', user.id);
-        setProfile(prev => prev ? { ...prev, balance: newUsdtBalance } : prev);
+        updateProfileLocally({ balance: newUsdtBalance });
       }
 
       // Record Order
@@ -444,13 +558,12 @@ const Spot = () => {
       saveSpotOrders([newOrder, ...spotOrders]);
       toast.success(
         type === 'MARKET'
-          ? `Sold ${amount.toFixed(4)} ${baseSymbol} for $${total.toFixed(2)} USDT`
-          : `Limit Sell Order placed for ${amount.toFixed(4)} ${baseSymbol} @ $${price.toFixed(2)}`
+          ? `Sold ${amount.toFixed(4)} ${baseSymbol} @ Mark Price for $${total.toFixed(2)} USDT`
+          : `Limit Sell Order placed for ${amount.toFixed(4)} ${baseSymbol} @ $${price.toLocaleString(undefined, { minimumFractionDigits: 2 })} (Placed in Open Orders)`
       );
     }
 
     loadProfile();
-    loadAssets();
   };
 
   // Cancel Limit Order
@@ -462,22 +575,37 @@ const Spot = () => {
       // Refund USDT
       const newBal = (profile.balance || 0) + order.total;
       await supabase.from('profiles').update({ balance: newBal }).eq('id', user.id);
-      setProfile(prev => prev ? { ...prev, balance: newBal } : prev);
+      updateProfileLocally({ balance: newBal });
     } else {
       // Refund Base Asset
-      const existingAsset = userAssets.find(a => a.symbol === order.symbol);
-      if (existingAsset) {
-        await supabase.from('user_assets').update({ amount: existingAsset.amount + order.amount }).eq('id', existingAsset.id);
+      const existingAssetIndex = userAssets.findIndex(a => a.symbol === order.symbol);
+      let updatedAssets: UserAsset[];
+
+      if (existingAssetIndex >= 0) {
+        const existing = userAssets[existingAssetIndex];
+        const newAmt = Number((Number(existing.amount) + order.amount).toFixed(8));
+        updatedAssets = userAssets.map((a, idx) => idx === existingAssetIndex ? { ...a, amount: newAmt } : a);
+        await supabase.from('user_assets').update({ amount: newAmt }).eq('id', existing.id);
       } else {
-        await supabase.from('user_assets').insert({ user_id: user.id, symbol: order.symbol, amount: order.amount });
+        const newAssetItem: UserAsset = {
+          id: 'asset_' + Math.random().toString(36).substring(2, 9),
+          user_id: user.id,
+          symbol: order.symbol,
+          amount: Number(order.amount.toFixed(8)),
+          created_at: new Date().toISOString()
+        };
+        updatedAssets = [...userAssets, newAssetItem];
+        await supabase.from('user_assets').insert({ user_id: user.id, symbol: order.symbol, amount: Number(order.amount.toFixed(8)) });
       }
+
+      setUserAssets(updatedAssets);
+      localStorage.setItem(`user_assets_${user.id}`, JSON.stringify(updatedAssets));
     }
 
     const updatedOrders = spotOrders.map(o => o.id === orderId ? { ...o, status: 'CANCELLED' as const } : o);
     saveSpotOrders(updatedOrders);
     toast.info("Limit order cancelled and funds returned.");
     loadProfile();
-    loadAssets();
   };
 
   const handleClearHistory = () => {
@@ -499,7 +627,7 @@ const Spot = () => {
     const newFutures = transferFromSpot ? (profile.futures_balance || 0) + amount : (profile.futures_balance || 0) - amount;
 
     await supabase.from('profiles').update({ balance: newSpot, futures_balance: newFutures }).eq('id', user.id);
-    setProfile({ ...profile, balance: newSpot, futures_balance: newFutures });
+    updateProfileLocally({ balance: newSpot, futures_balance: newFutures });
     setIsTransferring(false);
     setShowTransfer(false);
     setTransferAmount('');
@@ -542,7 +670,7 @@ const Spot = () => {
       const currentBal = dbProfile?.balance ?? 0;
       const newBal = Math.max(0, currentBal - amount);
       await supabase.from('profiles').update({ balance: newBal }).eq('id', user.id);
-      setProfile(prev => prev ? { ...prev, balance: newBal } : prev);
+      updateProfileLocally({ balance: newBal });
     } else {
       const { data: dbAsset } = await supabase.from('user_assets').select('*').eq('user_id', user.id).eq('symbol', convertFrom).maybeSingle();
       if (dbAsset) {
@@ -564,7 +692,7 @@ const Spot = () => {
       const { data: dbProfile } = await supabase.from('profiles').select('balance').eq('id', user.id).single();
       const newBalance = (dbProfile?.balance ?? 0) + toAmount;
       await supabase.from('profiles').update({ balance: newBalance }).eq('id', user.id);
-      setProfile(prev => prev ? { ...prev, balance: newBalance } : prev);
+      updateProfileLocally({ balance: newBalance });
     } else {
       const { data: dbAsset } = await supabase.from('user_assets').select('*').eq('user_id', user.id).eq('symbol', convertTo).maybeSingle();
       if (dbAsset) {

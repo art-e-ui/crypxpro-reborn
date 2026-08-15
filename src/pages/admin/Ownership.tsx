@@ -13,6 +13,7 @@ import {
   getCustomAccounts, 
   saveCustomAccounts, 
   getNextAdminId,
+  getAdminReferralCode,
   isPrimaryOwner,
   DEFAULT_PAGES,
   syncCustomAccountsWithSupabase,
@@ -302,10 +303,16 @@ const AdminOwnership = () => {
 
           <form onSubmit={handleCreateAdmin} className="space-y-4">
             <div>
-              <label className="block text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5">Assigned Admin ID</label>
-              <div className="w-full px-4 py-3 bg-muted border border-border rounded-xl text-sm font-bold text-primary font-mono flex items-center gap-2">
-                <ShieldCheck size={16} />
-                {nextPreviewId}
+              <label className="block text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5">Assigned Admin ID & Referral Code</label>
+              <div className="flex gap-2">
+                <div className="flex-1 px-4 py-3 bg-muted border border-border rounded-xl text-sm font-bold text-primary font-mono flex items-center gap-2">
+                  <ShieldCheck size={16} />
+                  {nextPreviewId}
+                </div>
+                <div className="px-4 py-3 bg-primary/10 border border-primary/20 rounded-xl text-sm font-black text-primary font-mono flex items-center gap-1.5" title="Unique referral code">
+                  <span className="text-[10px] uppercase font-sans text-muted-foreground">Code:</span>
+                  {getAdminReferralCode(nextPreviewId)}
+                </div>
               </div>
             </div>
 
@@ -431,6 +438,9 @@ const AdminOwnership = () => {
                           {admin.username}
                           <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[9px] uppercase font-bold rounded-full border border-blue-500/20">
                             ADMINISTRATOR
+                          </span>
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary text-[9px] uppercase font-bold font-mono rounded-full border border-primary/20">
+                            Ref: {getAdminReferralCode(admin)}
                           </span>
                         </h4>
                         <p className="text-xs text-muted-foreground font-medium">{admin.email}</p>

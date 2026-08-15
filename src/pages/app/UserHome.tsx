@@ -497,19 +497,34 @@ const UserHome = () => {
       }, () => {
         supabase.from('user_assets').select('*').eq('user_id', user.id).then(({ data }) => {
           if (data) setUserAssets(data as UserAsset[]);
-        });
+        }).catch(() => {});
       })
       .subscribe();
 
     // Initial fetch for everything else
-    supabase.from('user_assets').select('*').eq('user_id', user.id).then(({ data }) => {
-      if (data) setUserAssets(data as UserAsset[]);
-    });
+    const storedAssets = localStorage.getItem(`user_assets_${user.id}`);
+    if (storedAssets) {
+      try {
+        const parsed = JSON.parse(storedAssets);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setUserAssets(parsed);
+        }
+      } catch (e) {
+        console.error("Error reading stored assets", e);
+      }
+    }
+
+    supabase.from('user_assets').select('*').eq('user_id', user.id).then(({ data, error }) => {
+      if (!error && data) {
+        setUserAssets(data as UserAsset[]);
+        localStorage.setItem(`user_assets_${user.id}`, JSON.stringify(data));
+      }
+    }).catch(() => {});
     supabase.from('positions').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'OPEN').then(({ count }) => {
       setActiveTradesCount(count || 0);
-    });
-    newsService.getLatestNews().then(setNews);
-    const fetchPrices = () => marketService.getPrices().then(setPrices).catch(err => console.error(err));
+    }).catch(() => {});
+    newsService.getLatestNews().then(setNews).catch(() => {});
+    const fetchPrices = () => marketService.getPrices().then(setPrices).catch(() => {});
     fetchPrices();
     
     // Subscribe to live synchronous ticks from Binance WebSocket & REST feed
@@ -530,7 +545,7 @@ const UserHome = () => {
 
     supabase.from('support_config').select('*').limit(1).single().then(({ data }) => {
       if (data) setSupportInfo(data as any);
-    });
+    }).catch(() => {});
 
     // Refresh prices periodically
     const priceInterval = setInterval(fetchPrices, 3000);

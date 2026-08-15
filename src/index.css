@@ -199,3 +199,96 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--muted-foreground) / 0.3);
 }
+
+/* ==========================================================================
+   WOT (Web of Trust) Verification Badge Styles
+   ========================================================================== */
+.wot-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background-color: #ffffff !important;
+  padding: 6px 14px 6px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.06), 0px 1px 2px rgba(0, 0, 0, 0.04) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  box-sizing: border-box !important;
+  width: fit-content !important;
+  height: 36px !important;
+}
+
+.dark .wot-badge,
+.wot-badge.dark {
+  background-color: #1e2329 !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+.wot-badge:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0px 4px 14px rgba(0, 0, 0, 0.12) !important;
+}
+
+.wot-badge .wot-logo {
+  background: url('https://static.mywot.com/website_owners_badges/images/wot_logo.svg') no-repeat center / contain !important;
+  width: 44px !important;
+  height: 18px !important;
+  display: block !important;
+  flex-shrink: 0 !important;
+}
+
+.wot-badge .wot-shield {
+  background: url('https://static.mywot.com/website_owners_badges/images/check_arrow.svg') no-repeat center / contain !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+  flex-shrink: 0 !important;
+}
+
+.wot-badge .wot-secured {
+  color: #1e2329 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  font-family: inherit !important;
+}
+
+.dark .wot-badge .wot-secured,
+.wot-badge.dark .wot-secured {
+  color: #ffffff !important;
+}
+
+.wot-badge .wot-vertical {
+  width: 1px !important;
+  height: 16px !important;
+  background: #d3d9de !important;
+  display: block !important;
+  flex-shrink: 0 !important;
+}
+
+.dark .wot-badge .wot-vertical,
+.wot-badge.dark .wot-vertical {
+  background: #4b5563 !important;
+}
+
+.wot-badge .wot-report {
+  color: #64748b !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  text-decoration: underline !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+  font-family: inherit !important;
+}
+
+.dark .wot-badge .wot-report,
+.wot-badge.dark .wot-report {
+  color: #94a3b8 !important;
+}
+

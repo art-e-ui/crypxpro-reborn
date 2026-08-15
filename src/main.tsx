@@ -3,6 +3,23 @@ import App from "@/App.tsx";
 import { marketService } from "@/services/market";
 import "./index.css";
 
+// Intercept and swallow benign network fetch errors (CORS, offline, aborted requests)
+if (typeof window !== "undefined") {
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event?.reason;
+    const msg = typeof reason === "string" ? reason : reason?.message || "";
+    if (
+      msg.includes("Failed to fetch") ||
+      msg.includes("NetworkError") ||
+      msg.includes("AbortError") ||
+      msg.includes("Load failed")
+    ) {
+      event.preventDefault();
+      console.debug("Intercepted background fetch error:", msg);
+    }
+  });
+}
+
 // Initialize market service
 marketService.init();
 

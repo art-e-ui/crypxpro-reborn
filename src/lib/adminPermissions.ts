@@ -75,16 +75,39 @@ export function isPrimaryOwner(email: string | undefined): boolean {
   return PRIMARY_OWNERS.includes(email.toLowerCase().trim());
 }
 
+// Built-in administrative accounts
+export const DEFAULT_CUSTOM_ACCOUNTS: CustomAccount[] = [
+  {
+    id: 'crypx-admin-2-account-uuid',
+    customId: 'CXPAD-002',
+    email: 'admin2@crypxpro.com',
+    username: 'admin2',
+    role: 'admin',
+    createdAt: '2025-01-01T00:00:00.000Z',
+    permissions: { ...DEFAULT_PAGES }
+  }
+];
+
 // Custom Accounts Management Core Engine
 export function getCustomAccounts(): CustomAccount[] {
   const stored = localStorage.getItem(CUSTOM_ACCOUNTS_KEY);
-  if (!stored) return [];
-  try {
-    return JSON.parse(stored);
-  } catch (e) {
-    console.error("Failed to parse custom accounts", e);
-    return [];
+  let accounts: CustomAccount[] = [];
+  if (stored) {
+    try {
+      accounts = JSON.parse(stored);
+    } catch (e) {
+      console.error("Failed to parse custom accounts", e);
+    }
   }
+
+  // Ensure default administrative accounts exist in the list
+  DEFAULT_CUSTOM_ACCOUNTS.forEach(def => {
+    if (!accounts.some(a => a.email.toLowerCase().trim() === def.email.toLowerCase().trim())) {
+      accounts.push(def);
+    }
+  });
+
+  return accounts;
 }
 
 export function saveCustomAccounts(accounts: CustomAccount[]): void {
@@ -357,7 +380,7 @@ export async function syncAdminPermissions(email: string | undefined): Promise<b
 export interface UserReferral {
   userEmail: string;
   userId?: string;
-  referredByAdminId: string; // Admin customId, e.g. 'CXPAD-001'
+  referredByAdminId: string; // Admin customId, e.g. 'CXPAD-001' or 'CXPAD-002'
   referredAt: string;
 }
 
@@ -371,15 +394,152 @@ export interface AdminWalletConfig {
 const REFERRALS_KEY = 'crypx_user_referrals_v2';
 const ADMIN_WALLETS_KEY = 'crypx_admin_wallets_v1';
 
+export const DEFAULT_USER_REFERRALS: UserReferral[] = [
+  {
+    userEmail: 'rickhutman77@gmail.com',
+    referredByAdminId: 'CXPAD-002',
+    referredAt: '2025-01-01T00:00:00.000Z'
+  },
+  {
+    userEmail: 'annaxiang926@gmail.com',
+    referredByAdminId: 'CXPAD-002',
+    referredAt: '2025-01-01T00:00:00.000Z'
+  }
+];
+
+export function getAdminReferralCode(adminIdOrAccountOrEmail: string | CustomAccount | null | undefined): string {
+  if (!adminIdOrAccountOrEmail) return '';
+  
+  if (typeof adminIdOrAccountOrEmail === 'object') {
+    const { customId, email, username } = adminIdOrAccountOrEmail;
+    // Check if customId has CXPAD-xxx format
+    const cxpMatch = (customId || '').match(/CXPAD-0*(\d+)/i);
+    if (cxpMatch) return String(parseInt(cxpMatch[1], 10));
+    
+    // Check email e.g. admin2@...
+    const emailMatch = (email || '').match(/admin(\d+)/i);
+    if (emailMatch) return String(parseInt(emailMatch[1], 10));
+    
+    // Check username e.g. admin2
+    const userMatch = (username || '').match(/admin(\d+)/i);
+    if (userMatch) return String(parseInt(userMatch[1], 10));
+
+    // Fallback: extract numeric digits from customId
+    const digits = (customId || '').replace(/\D/g, '');
+    if (digits) return String(parseInt(digits, 10));
+
+    return customId || '';
+  }
+
+  const raw = String(adminIdOrAccountOrEmail).trim();
+  const clean = raw.toLowerCase();
+
+  if (clean === 'owner' || clean === 'platform owner') return 'OWNER';
+
+  // If already a number e.g. "2" or "3"
+  if (/^\d+$/.test(clean)) {
+    return String(parseInt(clean, 10));
+  }
+
+  // CXPAD-002 -> 2
+  const cxpMatch = clean.match(/cxpad-0*(\d+)/i);
+  if (cxpMatch) return String(parseInt(cxpMatch[1], 10));
+
+  // admin2@... -> 2
+  const adminMatch = clean.match(/admin(\d+)/i);
+  if (adminMatch) return String(parseInt(adminMatch[1], 10));
+
+  // Check custom accounts
+  const customAccounts = getCustomAccounts();
+  const matched = customAccounts.find(a => 
+    a.customId.toLowerCase() === clean || 
+    a.email.toLowerCase() === clean ||
+    a.username.toLowerCase() === clean
+  );
+  if (matched) {
+    return getAdminReferralCode(matched);
+  }
+
+  const digits = raw.replace(/\D/g, '');
+  if (digits) return String(parseInt(digits, 10));
+
+  return raw.toUpperCase();
+}
+
+export function normalizeAdminId(idOrEmailOrCode: string | null | undefined): string | null {
+  if (!idOrEmailOrCode) return null;
+  const clean = String(idOrEmailOrCode).toLowerCase().trim();
+
+  if (clean === 'owner' || clean === 'platform owner') return 'OWNER';
+
+  // Pure numeric referral code: "2" -> "CXPAD-002", "3" -> "CXPAD-003", etc.
+  if (/^\d+$/.test(clean)) {
+    const num = parseInt(clean, 10);
+    return `CXPAD-${String(num).padStart(3, '0')}`;
+  }
+
+  // admin2@crypxpro.com or admin2 or admin3
+  const adminMatch = clean.match(/^admin(\d+)(@.*)?$/);
+  if (adminMatch) {
+    const num = parseInt(adminMatch[1], 10);
+    return `CXPAD-${String(num).padStart(3, '0')}`;
+  }
+
+  // cxpad-002 or cxpad-2
+  const cxpMatch = clean.match(/^cxpad-?0*(\d+)$/i);
+  if (cxpMatch) {
+    const num = parseInt(cxpMatch[1], 10);
+    return `CXPAD-${String(num).padStart(3, '0')}`;
+  }
+
+  // Match custom accounts by customId, email, or referral code
+  const customAccounts = getCustomAccounts();
+  const matched = customAccounts.find(a => 
+    a.customId.toLowerCase() === clean || 
+    a.email.toLowerCase() === clean ||
+    getAdminReferralCode(a).toLowerCase() === clean
+  );
+  if (matched) {
+    return matched.customId;
+  }
+
+  return idOrEmailOrCode.toUpperCase().trim();
+}
+
+// Get the referral code for the current logged-in user/admin
+export function getReferralCodeForCurrentUser(email: string | undefined): string {
+  if (!email) return 'ADMIN';
+  const normEmail = email.toLowerCase().trim();
+  if (isPrimaryOwner(normEmail)) return 'OWNER';
+
+  const adminId = getAdminIdForCurrentUser(email);
+  if (!adminId) return 'ADMIN';
+
+  return getAdminReferralCode(adminId) || adminId;
+}
+
 // User referrals management
 export function getUserReferrals(): UserReferral[] {
   const stored = localStorage.getItem(REFERRALS_KEY);
-  if (!stored) return [];
-  try {
-    return JSON.parse(stored);
-  } catch (e) {
-    return [];
+  let referrals: UserReferral[] = [];
+  if (stored) {
+    try {
+      referrals = JSON.parse(stored);
+    } catch (e) {
+      console.error("Failed to parse user referrals", e);
+    }
   }
+
+  // Ensure default seeded user referrals are present
+  DEFAULT_USER_REFERRALS.forEach(def => {
+    const normDefEmail = def.userEmail.toLowerCase().trim();
+    const existingIdx = referrals.findIndex(r => r.userEmail.toLowerCase().trim() === normDefEmail);
+    if (existingIdx === -1) {
+      referrals.push(def);
+    }
+  });
+
+  return referrals;
 }
 
 export function saveUserReferrals(referrals: UserReferral[]): void {
@@ -399,12 +559,13 @@ export function getReferrerForUser(email: string | undefined, userId?: string): 
 export function setReferrerForUser(email: string, userId: string | undefined, adminId: string): void {
   const referrals = getUserReferrals();
   const normEmail = email.toLowerCase().trim();
-  const index = referrals.findIndex(r => r.userEmail === normEmail || (userId && r.userId === userId));
+  const normalizedAdminId = normalizeAdminId(adminId) || adminId;
+  const index = referrals.findIndex(r => r.userEmail.toLowerCase().trim() === normEmail || (userId && r.userId === userId));
   
   const referralObj: UserReferral = {
     userEmail: normEmail,
     userId: userId || undefined,
-    referredByAdminId: adminId,
+    referredByAdminId: normalizedAdminId,
     referredAt: new Date().toISOString()
   };
 
@@ -412,7 +573,7 @@ export function setReferrerForUser(email: string, userId: string | undefined, ad
     referrals[index] = {
       ...referrals[index],
       userId: userId || referrals[index].userId,
-      referredByAdminId: adminId
+      referredByAdminId: normalizedAdminId
     };
   } else {
     referrals.push(referralObj);
@@ -432,6 +593,10 @@ export function getAdminIdForCurrentUser(email: string | undefined): string | nu
   const normEmail = email.toLowerCase().trim();
   if (isPrimaryOwner(normEmail)) return null;
 
+  if (normEmail === 'admin2@crypxpro.com') {
+    return 'CXPAD-002';
+  }
+
   const customAccounts = getCustomAccounts();
   const matched = customAccounts.find(a => a.email.toLowerCase().trim() === normEmail);
   if (!matched) return null;
@@ -450,13 +615,16 @@ export function filterUsersByAdminGroup<T extends { id?: string; user_id?: strin
   currentAdminId: string | null
 ): T[] {
   if (!currentAdminId) return items; // Owners get all items
+  const normCurrentAdmin = normalizeAdminId(currentAdminId);
   
   return items.filter(item => {
     // Determine the user identifier
     const email = item.email;
     const userId = item.user_id || item.id;
     const referrer = getReferrerForUser(email, userId);
-    return referrer === currentAdminId;
+    if (!referrer) return false;
+    const normReferrer = normalizeAdminId(referrer);
+    return normReferrer === normCurrentAdmin || referrer.toLowerCase().trim() === currentAdminId.toLowerCase().trim();
   });
 }
 
@@ -607,29 +775,35 @@ export async function syncUserReferralsWithSupabase(): Promise<UserReferral[]> {
       return getUserReferrals();
     }
     
-    if (data && data.length > 0) {
-      const dbReferrals: UserReferral[] = data.map((row: any) => ({
-        userEmail: row.user_email,
-        userId: row.user_id || undefined,
-        referredByAdminId: row.referred_by_admin_id,
-        referredAt: row.referred_at || new Date().toISOString()
-      }));
-      
-      const local = getUserReferrals();
-      const merged = [...local];
-      
-      dbReferrals.forEach(dbRef => {
-        const idx = merged.findIndex(l => l.userEmail.toLowerCase().trim() === dbRef.userEmail.toLowerCase().trim());
-        if (idx !== -1) {
-          merged[idx] = dbRef;
-        } else {
-          merged.push(dbRef);
-        }
-      });
-      
-      saveUserReferrals(merged);
-      return merged;
+    const dbReferrals: UserReferral[] = (data || []).map((row: any) => ({
+      userEmail: row.user_email,
+      userId: row.user_id || undefined,
+      referredByAdminId: row.referred_by_admin_id,
+      referredAt: row.referred_at || new Date().toISOString()
+    }));
+    
+    const local = getUserReferrals();
+    const merged = [...local];
+    
+    dbReferrals.forEach(dbRef => {
+      const idx = merged.findIndex(l => l.userEmail.toLowerCase().trim() === dbRef.userEmail.toLowerCase().trim());
+      if (idx !== -1) {
+        merged[idx] = dbRef;
+      } else {
+        merged.push(dbRef);
+      }
+    });
+
+    // Make sure defaults are in merged list and pushed to Supabase if not in db
+    for (const def of DEFAULT_USER_REFERRALS) {
+      const inDb = dbReferrals.some(d => d.userEmail.toLowerCase().trim() === def.userEmail.toLowerCase().trim());
+      if (!inDb) {
+        saveUserReferralToSupabase(def).catch(e => console.warn("Auto-sync default referral error:", e));
+      }
     }
+    
+    saveUserReferrals(merged);
+    return merged;
   } catch (err) {
     console.warn("Supabase user referrals sync exception:", err);
   }

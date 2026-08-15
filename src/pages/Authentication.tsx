@@ -50,17 +50,17 @@ const Auth = () => {
   }, [session, navigate, appMode]);
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-hidden text-foreground">
+    <div className="min-h-screen bg-background flex items-center justify-center relative overflow-y-auto py-12 sm:py-16 px-4 text-foreground">
       {/* Immersive Crypto Background */}
       <div 
-        className="absolute inset-0 z-0 opacity-5 grayscale pointer-events-none"
+        className="fixed inset-0 z-0 opacity-5 grayscale pointer-events-none"
         style={{
           backgroundImage: 'url("https://images.unsplash.com/photo-1644024276273-4b901946849a?auto=format&fit=crop&q=80&w=2000")',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
       />
-      <div className="absolute inset-0 z-0">
+      <div className="fixed inset-0 z-0 pointer-events-none">
         <div 
           className="absolute inset-0 opacity-20 blur-[100px] dark:opacity-10"
           style={{
@@ -73,14 +73,14 @@ const Auth = () => {
         />
       </div>
 
-      <div className="relative z-10 w-full max-w-lg px-6 pt-40 pb-12 flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-lg px-2 sm:px-6 flex flex-col items-center my-auto">
         {/* Logo and Tagline */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-10 text-center"
+          className="mb-8 text-center"
         >
-          <Logo size={80} variant="SYMBOL" className="mb-6 mx-auto drop-shadow-[0_0_20px_rgba(255,191,0,0.2)] transition-transform hover:scale-105 duration-500" />
+          <Logo size={80} variant="SYMBOL" className="mb-4 mx-auto drop-shadow-[0_0_20px_rgba(255,191,0,0.2)] transition-transform hover:scale-105 duration-500" />
           <h2 className="text-foreground text-2xl font-light tracking-[0.4em] uppercase">CrypX Pro</h2>
         </motion.div>
 
@@ -89,10 +89,10 @@ const Auth = () => {
            initial={{ opacity: 0, y: 20 }}
            animate={{ opacity: 1, y: 0 }}
            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-           className="w-full relative p-10 md:p-14 rounded-[48px] border border-border bg-card/40 backdrop-blur-[40px] shadow-[0_32px_128px_-32px_rgba(0,0,0,0.08)]"
+           className="w-full relative p-6 sm:p-10 md:p-14 rounded-[32px] sm:rounded-[48px] border border-border bg-card/40 backdrop-blur-[40px] shadow-[0_32px_128px_-32px_rgba(0,0,0,0.08)]"
         >
           {/* Subtle Inner Glow */}
-          <div className="absolute inset-0 rounded-[48px] bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none dark:from-white/5" />
+          <div className="absolute inset-0 rounded-[32px] sm:rounded-[48px] bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none dark:from-white/5" />
           
           <AuthForm isInsideModal={true} />
         </motion.div>
@@ -100,10 +100,10 @@ const Auth = () => {
         {/* Action button helper for desktop landing return */}
         <motion.button
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.4 }}
-          whileHover={{ opacity: 0.8, y: -2 }}
+          animate={{ opacity: 0.5 }}
+          whileHover={{ opacity: 0.9, y: -2 }}
           onClick={() => navigate('/')}
-          className="mt-12 text-[10px] text-foreground uppercase tracking-[0.3em] transition-all font-medium"
+          className="mt-8 text-[10px] text-muted-foreground uppercase tracking-[0.3em] transition-all font-medium hover:text-foreground"
         >
           ← Return to Platform Overview
         </motion.button>
@@ -113,3 +113,4 @@ const Auth = () => {
 };
 
 export default Auth;
+
