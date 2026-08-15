@@ -8,13 +8,17 @@ import {
 import { Logo } from '@/components/shared/Logo';
 import { useAuth } from '@/hooks/useAuth';
 
-export const Settings = () => {
+interface SettingsProps {
+  initialTab?: string;
+}
+
+export const Settings = ({ initialTab: propInitialTab }: SettingsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
 
   // Tab management: 'overview' | 'terms' | 'policies' | 'faq'
-  const initialTab = searchParams.get('tab') || 'overview';
+  const initialTab = searchParams.get('tab') || propInitialTab || 'overview';
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [faqSearch, setFaqSearch] = useState('');
 
@@ -22,12 +26,22 @@ export const Settings = () => {
     const tabFromUrl = searchParams.get('tab');
     if (tabFromUrl && ['overview', 'terms', 'policies', 'faq'].includes(tabFromUrl)) {
       setActiveTab(tabFromUrl);
+    } else if (propInitialTab && ['overview', 'terms', 'policies', 'faq'].includes(propInitialTab)) {
+      setActiveTab(propInitialTab);
     }
-  }, [searchParams]);
+  }, [searchParams, propInitialTab]);
 
   const changeTab = (tab: string) => {
     setActiveTab(tab);
     setSearchParams({ tab });
+  };
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(user ? '/app/home' : '/');
+    }
   };
 
   // FAQ items data
@@ -106,9 +120,9 @@ export const Settings = () => {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => navigate('/app/home')}
+                onClick={handleBack}
                 className="p-2 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors mr-1"
-                title="Back to Home"
+                title="Go Back"
               >
                 <ArrowLeft size={20} />
               </button>

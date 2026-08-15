@@ -277,11 +277,12 @@ const Index = () => {
             </div>
             
             <div>
-              <h5 className="font-medium text-[10px] uppercase tracking-[0.2em] text-foreground/50 mb-8">Corporate</h5>
+              <h5 className="font-medium text-[10px] uppercase tracking-[0.2em] text-foreground/50 mb-8">Corporate & Legal</h5>
               <div className="flex flex-col gap-5 text-xs font-light text-muted-foreground">
-                <a href="#" className="hover:text-primary transition-colors">Our Firm</a>
-                <a href="#" className="hover:text-primary transition-colors">Legal Framework</a>
-                <a href="#" className="hover:text-primary transition-colors">Privacy Paradigm</a>
+                <a href="/terms" className="hover:text-primary transition-colors">Terms & Conditions</a>
+                <a href="/policies" className="hover:text-primary transition-colors">User Policies & Safeguards</a>
+                <a href="/faq" className="hover:text-primary transition-colors">App FAQ & Guide</a>
+                <a href="mailto:admin@crypxpro.com" className="hover:text-primary transition-colors">admin@crypxpro.com</a>
               </div>
             </div>
             

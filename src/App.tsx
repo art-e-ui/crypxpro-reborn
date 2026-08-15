@@ -51,6 +51,10 @@ const App = () => (
             {/* Public Routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Authentication />} />
+            <Route path="/terms" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="terms" /></Suspense>} />
+            <Route path="/policies" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="policies" /></Suspense>} />
+            <Route path="/faq" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="faq" /></Suspense>} />
+            <Route path="/settings" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="overview" /></Suspense>} />
 
             {/* User App Routes */}
             <Route path="/app" element={<MainLayout />}>
@@ -62,10 +66,10 @@ const App = () => (
               <Route path="futures" element={<Futures />} />
               <Route path="earn" element={<Earn />} />
               <Route path="assets" element={<Assets />} />
-              <Route path="settings" element={<Navigate to="/app/home" replace />} />
-              <Route path="terms" element={<Navigate to="/app/home" replace />} />
-              <Route path="policies" element={<Navigate to="/app/home" replace />} />
-              <Route path="faq" element={<Navigate to="/app/home" replace />} />
+              <Route path="settings" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="overview" /></Suspense>} />
+              <Route path="terms" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="terms" /></Suspense>} />
+              <Route path="policies" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="policies" /></Suspense>} />
+              <Route path="faq" element={<Suspense fallback={<div className="min-h-screen bg-background" />}><Settings initialTab="faq" /></Suspense>} />
               <Route path="admin" element={<Navigate to="/admin" replace />} />
             </Route>
 
