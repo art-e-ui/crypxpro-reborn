@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 export interface TokenPriceSchedule {
   id: string;
   symbol: string; // e.g. "NAS", "AEP", "BOT", "TTZS", "ECB", etc.
@@ -99,21 +101,137 @@ const loadFromStorage = () => {
 
 loadFromStorage();
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (
+      e.key === SCHEDULES_STORAGE_KEY ||
+      e.key === MANUAL_OVERRIDES_KEY ||
+      e.key === AUDIT_LOGS_KEY
+    ) {
+      loadFromStorage();
+      window.dispatchEvent(new Event('token-price-control-updated'));
+    }
+  });
+}
+
+// Supabase Realtime Broadcast and Database Syncing
+let broadcastChannel: any = null;
+
+export const loadTokenPricesFromDB = async () => {
+  try {
+    const { data, error } = await supabase.from('admin_wallet_configs')
+      .select('address')
+      .eq('admin_id', 'SYSTEM_PRICES')
+      .eq('symbol', 'CONFIG')
+      .eq('network', 'DATA')
+      .maybeSingle();
+
+    if (!error && data && data.address) {
+      const parsed = JSON.parse(data.address);
+      if (parsed.schedulesMap) schedulesMap = parsed.schedulesMap;
+      if (parsed.manualOverridesMap) manualOverridesMap = parsed.manualOverridesMap;
+      if (parsed.auditLogsList) auditLogsList = parsed.auditLogsList;
+      
+      localStorage.setItem(SCHEDULES_STORAGE_KEY, JSON.stringify(schedulesMap));
+      localStorage.setItem(MANUAL_OVERRIDES_KEY, JSON.stringify(manualOverridesMap));
+      localStorage.setItem(AUDIT_LOGS_KEY, JSON.stringify(auditLogsList));
+      window.dispatchEvent(new Event('token-price-control-updated'));
+    }
+  } catch (err) {
+    console.error("Failed to load token prices from DB:", err);
+  }
+};
+
+const saveTokenPricesToDB = async () => {
+  try {
+    const payload = JSON.stringify({
+      schedulesMap,
+      manualOverridesMap,
+      auditLogsList
+    });
+    
+    await supabase.from('admin_wallet_configs').upsert({
+      admin_id: 'SYSTEM_PRICES',
+      symbol: 'CONFIG',
+      network: 'DATA',
+      address: payload
+    }, { onConflict: 'admin_id,symbol,network' });
+  } catch (err) {
+    console.error("Failed to save token prices to DB:", err);
+  }
+};
+
+if (typeof window !== 'undefined') {
+  broadcastChannel = supabase.channel('token-prices-sync');
+  
+  broadcastChannel
+    .on('broadcast', { event: 'sync' }, (payload: any) => {
+      const { schedules, overrides, logs } = payload.payload;
+      if (schedules) schedulesMap = schedules;
+      if (overrides) manualOverridesMap = overrides;
+      if (logs) auditLogsList = logs;
+      
+      localStorage.setItem(SCHEDULES_STORAGE_KEY, JSON.stringify(schedulesMap));
+      localStorage.setItem(MANUAL_OVERRIDES_KEY, JSON.stringify(manualOverridesMap));
+      localStorage.setItem(AUDIT_LOGS_KEY, JSON.stringify(auditLogsList));
+      window.dispatchEvent(new Event('token-price-control-updated'));
+    })
+    .on('broadcast', { event: 'request_sync' }, () => {
+      // Respond to sync requests
+      if (Object.keys(schedulesMap).length > 0 || Object.keys(manualOverridesMap).length > 0) {
+        broadcastState();
+      }
+    })
+    .subscribe((status: string) => {
+      if (status === 'SUBSCRIBED') {
+        // Load from DB first when connected
+        loadTokenPricesFromDB().then(() => {
+          if (Object.keys(schedulesMap).length === 0 && Object.keys(manualOverridesMap).length === 0) {
+            broadcastChannel.send({
+              type: 'broadcast',
+              event: 'request_sync'
+            }).catch(console.error);
+          }
+        });
+      }
+    });
+}
+
+const broadcastState = () => {
+  if (broadcastChannel) {
+    broadcastChannel.send({
+      type: 'broadcast',
+      event: 'sync',
+      payload: {
+        schedules: schedulesMap,
+        overrides: manualOverridesMap,
+        logs: auditLogsList
+      }
+    }).catch(console.error);
+  }
+};
+
 const saveSchedules = () => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(SCHEDULES_STORAGE_KEY, JSON.stringify(schedulesMap));
   window.dispatchEvent(new Event('token-price-control-updated'));
+  broadcastState();
+  saveTokenPricesToDB();
 };
 
 const saveOverrides = () => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(MANUAL_OVERRIDES_KEY, JSON.stringify(manualOverridesMap));
   window.dispatchEvent(new Event('token-price-control-updated'));
+  broadcastState();
+  saveTokenPricesToDB();
 };
 
 const saveAuditLogs = () => {
   if (typeof window === 'undefined') return;
   localStorage.setItem(AUDIT_LOGS_KEY, JSON.stringify(auditLogsList));
+  broadcastState();
+  saveTokenPricesToDB();
 };
 
 const logAction = (symbol: string, action: string, details: string, adminEmail: string = 'admin') => {
