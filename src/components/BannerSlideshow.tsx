@@ -11,7 +11,7 @@ const slides = [
     color: "from-emerald-500/20 to-emerald-900/40",
     accent: "text-emerald-400",
     link: "/app/spot",
-    image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&q=80&w=1200"
+    image: "/slide-spot.jpg"
   },
   {
     id: "futures",
@@ -21,7 +21,7 @@ const slides = [
     color: "from-cyan-500/20 to-cyan-900/40",
     accent: "text-cyan-400",
     link: "/app/futures",
-    image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=1200"
+    image: "/slide-futures.jpg"
   },
   {
     id: "earn",
@@ -31,7 +31,7 @@ const slides = [
     color: "from-blue-500/20 to-blue-900/40",
     accent: "text-blue-400",
     link: "/app/earn",
-    image: "https://images.unsplash.com/photo-1621761191319-c6fb62004040?auto=format&fit=crop&q=80&w=1200"
+    image: "/slide-earn.jpg"
   },
   {
     id: "assets",
@@ -41,7 +41,7 @@ const slides = [
     color: "from-purple-500/20 to-purple-900/40",
     accent: "text-purple-400",
     link: "/app/assets",
-    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&q=80&w=1200"
+    image: "/security-vault.jpg"
   },
   {
     id: "support",
@@ -51,7 +51,7 @@ const slides = [
     color: "from-rose-500/20 to-rose-900/40",
     accent: "text-rose-400",
     link: "/app/home",
-    image: "https://images.unsplash.com/photo-1521791136064-7986c2923216?auto=format&fit=crop&q=80&w=1200"
+    image: "/slide-support.jpg"
   }
 ];
 

@@ -59,7 +59,18 @@ const Futures = () => {
   const profile = authProfile || getFallbackUserProfile(user);
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [positionTab, setPositionTab] = useState<'active' | 'history'>('active');
-  const [selectedPair, setSelectedPair] = useState(PAIRS[0]);
+  const [selectedPair, setSelectedPair] = useState(() => {
+    const stored = sessionStorage.getItem('futures_selected_pair');
+    if (stored) {
+      const pair = PAIRS.find(p => p.symbol === stored);
+      if (pair) return pair;
+    }
+    return PAIRS[0];
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('futures_selected_pair', selectedPair.symbol);
+  }, [selectedPair]);
   const [tickers, setTickers] = useState<Record<string, MarketTicker>>({});
   const [chartInterval, setChartInterval] = useState('1m');
   const [leverage, setLeverage] = useState(25);
