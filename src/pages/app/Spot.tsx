@@ -9,7 +9,7 @@ import type { UserProfile, UserAsset, SpotOrder } from '@/types';
 import { 
   RefreshCw, X, ChevronDown, ArrowDown, Wallet, DollarSign, 
   TrendingUp, ArrowRightLeft, SlidersHorizontal
-} from 'lucide-react';
+, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
@@ -209,6 +209,14 @@ const Spot = () => {
 
   // Spot Order History & Open Orders state
   const [spotOrders, setSpotOrders] = useState<SpotOrder[]>([]);
+  const [showChart, setShowChart] = useState(() => {
+    const saved = localStorage.getItem('crypx_spot_show_chart');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crypx_spot_show_chart', String(showChart));
+  }, [showChart]);
 
   // Convert modal state
   const [showConvert, setShowConvert] = useState(false);
@@ -812,7 +820,7 @@ const Spot = () => {
         {/* Main Trading Area Layout (Chart, Order Book, Spot Order Form) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           {/* 1. Trading Chart Card */}
-          <div className="lg:col-span-6 bg-card rounded-2xl p-3 border border-border shadow-sm flex flex-col justify-between space-y-3">
+          <div className={`${showChart ? 'lg:col-span-6' : 'lg:col-span-12'} bg-card rounded-2xl p-3 border border-border shadow-sm flex flex-col ${showChart ? 'justify-between space-y-3' : ''}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CryptoIcon symbol={baseSymbol} size={24} />
@@ -825,6 +833,7 @@ const Spot = () => {
               </div>
 
               {/* Timeframe Controls */}
+              <div className="flex items-center gap-2">
               <div className="flex gap-1 bg-muted/60 p-1 rounded-xl border border-border">
                 {['5s', '1m', '5m', '15m', '1h', '4h'].map(tf => (
                   <button 
@@ -840,16 +849,25 @@ const Spot = () => {
                   </button>
                 ))}
               </div>
+                <button 
+                  onClick={() => setShowChart(!showChart)}
+                  className="bg-muted text-muted-foreground hover:bg-accent hover:text-foreground px-2 py-1 rounded-lg text-[10px] font-bold border border-border transition-colors flex items-center gap-1"
+                >
+                  {showChart ? <EyeOff size={12} /> : <Eye size={12} />}
+                  <span className="hidden sm:inline">{showChart ? 'Hide Chart' : 'Show Chart'}</span>
+                </button>
+              </div>
             </div>
-
             {/* Chart Area */}
-            <div className="h-[380px] sm:h-[420px] w-full rounded-xl overflow-hidden border border-border">
-              <TradingChart symbol={selectedPair} interval={chartInterval} className="h-full" />
-            </div>
+            {showChart && (
+              <div className="h-[380px] sm:h-[420px] w-full rounded-xl overflow-hidden border border-border mt-3">
+                <TradingChart symbol={selectedPair} interval={chartInterval} className="h-full" />
+              </div>
+            )}
           </div>
 
           {/* 2. Order Book */}
-          <div className="lg:col-span-3 h-[420px] sm:h-[480px]">
+          <div className={`${showChart ? 'lg:col-span-3' : 'lg:col-span-6'} h-[420px] sm:h-[480px]`}>
             <EnhancedOrderBook
               symbol={selectedPair}
               onSelectPrice={(price) => setSelectedPriceOverride(price)}
@@ -857,7 +875,7 @@ const Spot = () => {
           </div>
 
           {/* 3. Spot Buy / Sell Order Form */}
-          <div className="lg:col-span-3 h-[420px] sm:h-[480px]">
+          <div className={`${showChart ? 'lg:col-span-3' : 'lg:col-span-6'} h-[420px] sm:h-[480px]`}>
             <SpotOrderForm
               symbol={baseSymbol}
               pair={selectedPair}

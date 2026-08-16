@@ -106,37 +106,41 @@ export const AdminSampleTokens = () => {
     const targetSyms = selectedTokens.length > 0 && selectedTokens.includes(activeSymbol)
       ? selectedTokens
       : [activeSymbol];
-
-    if (adjustType === 'manual_override') {
-      const numPrice = parseFloat(targetPriceInput);
-      if (isNaN(numPrice) || numPrice <= 0) {
-        toast.error('Please specify a valid price greater than 0');
-        return;
-      }
-      targetSyms.forEach(sym => {
-        tokenPriceControl.setManualOverride(sym, numPrice, adminEmail);
-      });
-      toast.success(`Set manual override price to $${numPrice.toFixed(2)} for ${targetSyms.join(', ')}`);
-    } else {
-      targetSyms.forEach(sym => {
-        const tokenMeta = SAMPLE_TOKENS_LIST.find(t => t.symbol === sym);
-        const startP = livePrices[sym] || tokenMeta?.defaultPrice || 100;
-
-        tokenPriceControl.setSchedule({
-          symbol: sym,
-          direction: direction,
-          type: adjustType,
-          changePercent: adjustType === 'percentage' ? changePercent : undefined,
-          targetPrice: adjustType === 'fixed_target' ? parseFloat(targetPriceInput) : undefined,
-          durationHours: durationHoursTotal,
-          startPrice: startP,
-          adminEmail,
-          note: noteInput || `Admin adjustment (${direction} by ${changePercent}% in ${durationValue} ${durationUnit})`
+    try {
+      if (adjustType === 'manual_override') {
+        const numPrice = parseFloat(targetPriceInput);
+        if (isNaN(numPrice) || numPrice <= 0) {
+          toast.error('Please specify a valid price greater than 0');
+          return;
+        }
+        targetSyms.forEach(sym => {
+          tokenPriceControl.setManualOverride(sym, numPrice, adminEmail);
         });
-      });
+        toast.success(`Set manual override price to $${numPrice.toFixed(2)} for ${targetSyms.join(', ')}`);
+      } else {
+        targetSyms.forEach(sym => {
+          const tokenMeta = SAMPLE_TOKENS_LIST.find(t => t.symbol === sym);
+          const startP = livePrices[sym] || tokenMeta?.defaultPrice || 100;
 
-      const dirStr = direction === 'decrease' ? 'decrease' : 'increase';
-      toast.success(`Scheduled ${dirStr} of ${changePercent}% over ${durationValue} ${durationUnit} for ${targetSyms.join(', ')}`);
+          tokenPriceControl.setSchedule({
+            symbol: sym,
+            direction: direction,
+            type: adjustType,
+            changePercent: adjustType === 'percentage' ? changePercent : undefined,
+            targetPrice: adjustType === 'fixed_target' ? parseFloat(targetPriceInput) : undefined,
+            durationHours: durationHoursTotal,
+            startPrice: startP,
+            adminEmail,
+            note: noteInput || `Admin adjustment (${direction} by ${changePercent}% in ${durationValue} ${durationUnit})`
+          });
+        });
+
+        const dirStr = direction === 'decrease' ? 'decrease' : 'increase';
+        toast.success(`Scheduled ${dirStr} of ${changePercent}% over ${durationValue} ${durationUnit} for ${targetSyms.join(', ')}`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Operation failed due to an ongoing lock by another admin.');
+      return;
     }
 
     setIsModalOpen(false);
@@ -152,22 +156,31 @@ export const AdminSampleTokens = () => {
 
   // Reset single token
   const handleResetToken = (symbol: string) => {
-    tokenPriceControl.resetToken(symbol, adminEmail);
-    toast.success(`Reset ${symbol} price to default baseline`);
-    refreshData();
+    try {
+      tokenPriceControl.resetToken(symbol, adminEmail);
+      toast.success(`Reset ${symbol} back to default baseline`);
+      refreshData();
+    } catch (err: any) {
+      toast.error(err.message || 'Operation failed.');
+    }
   };
 
   // Reset all tokens
   const handleResetAll = () => {
-    if (window.confirm('Are you sure you want to reset ALL sample token prices to default baseline?')) {
-      tokenPriceControl.resetAllTokens(adminEmail);
-      toast.success('Reset all sample tokens to default baseline prices');
-      refreshData();
+    if (window.confirm('Are you sure you want to reset ALL sample tokens to their standard default baselines? All active schedules will be permanently cleared.')) {
+      try {
+        tokenPriceControl.resetAllTokens(adminEmail);
+        toast.success('Reset all sample tokens to default baseline prices');
+        refreshData();
+      } catch (err: any) {
+        toast.error(err.message || 'Operation failed.');
+      }
     }
   };
 
   // Quick Preset Handlers
   const handleQuickPresetNAS20Pct1Day = () => {
+    try {
     const sym = 'NAS';
     const startP = livePrices[sym] || 92.54;
     tokenPriceControl.setSchedule({
@@ -180,11 +193,15 @@ export const AdminSampleTokens = () => {
       adminEmail,
       note: 'Quick preset: NAS -20% in 1 day'
     });
-    toast.success('Preset Applied: NAS price will decrease 20% within 1 day');
-    refreshData();
+      toast.success('Preset Applied: NAS price will decrease 20% within 1 day');
+      refreshData();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   const handleQuickPresetNAS20Pct4Days = () => {
+    try {
     const sym = 'NAS';
     const startP = livePrices[sym] || 92.54;
     tokenPriceControl.setSchedule({
@@ -197,8 +214,11 @@ export const AdminSampleTokens = () => {
       adminEmail,
       note: 'Quick preset: NAS -20% in 4 days'
     });
-    toast.success('Preset Applied: NAS price will decrease 20% within 4 days');
-    refreshData();
+      toast.success('Preset Applied: NAS price will decrease 20% within 4 days');
+      refreshData();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
   };
 
   // Filter tokens list

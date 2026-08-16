@@ -59,6 +59,14 @@ const Futures = () => {
   const profile = authProfile || getFallbackUserProfile(user);
   const [balanceHidden, setBalanceHidden] = useState(false);
   const [positionTab, setPositionTab] = useState<'active' | 'history'>('active');
+  const [showChart, setShowChart] = useState(() => {
+    const saved = localStorage.getItem('crypx_futures_show_chart');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('crypx_futures_show_chart', String(showChart));
+  }, [showChart]);
   const [selectedPair, setSelectedPair] = useState(() => {
     const stored = sessionStorage.getItem('futures_selected_pair');
     if (stored) {
@@ -258,7 +266,7 @@ const Futures = () => {
     <div className="pb-16 bg-background min-h-screen text-foreground max-w-7xl mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 p-3">
         {/* Left Column: Chart and Positions */}
-        <div className="lg:col-span-3 space-y-3">
+        <div className={`${showChart ? 'lg:col-span-3' : 'lg:col-span-2'} space-y-3`}>
           {/* Chart Section */}
           <div className="bg-card p-3 rounded-xl shadow-sm border border-border">
             <div className="flex items-center justify-between mb-2">
@@ -277,17 +285,27 @@ const Futures = () => {
                   </div>
                 </div>
               </div>
+              <div className="flex items-center">
               <div className="flex gap-1 overflow-x-auto no-scrollbar">
                 {['5s', '1m', '5m', '15m', '1h', '4h'].map(tf => (
                   <button key={tf} onClick={() => setChartInterval(tf)} className={`px-2 py-1 text-[9px] font-bold rounded transition-colors whitespace-nowrap ${chartInterval === tf ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}>{tf}</button>
                 ))}
               </div>
+              <button 
+                  onClick={() => setShowChart(!showChart)}
+                  className="bg-muted text-muted-foreground hover:bg-accent hover:text-foreground px-2 py-1 rounded-lg text-[9px] font-bold border border-border transition-colors flex items-center gap-1 ml-2"
+                >
+                  {showChart ? <EyeOff size={10} /> : <Eye size={10} />}
+                  <span className="hidden sm:inline">{showChart ? 'Hide Chart' : 'Show Chart'}</span>
+                </button>
             </div>
-            <div className="h-[300px] w-full border border-border rounded-lg overflow-hidden bg-card">
+            </div>
+            {showChart && (
+            <div className="h-[300px] w-full border border-border rounded-lg overflow-hidden mt-2 bg-card">
               <TradingChart symbol={selectedPair.symbol} className="h-full" interval={chartInterval} />
             </div>
+            )}
           </div>
-
           {/* Positions Section (Desktop) */}
           <div className="hidden lg:block bg-card rounded-xl p-4 shadow-sm border border-border">
             <div className="flex items-center gap-4 mb-3 border-b border-border">
@@ -398,7 +416,7 @@ const Futures = () => {
         </div>
 
         {/* Right Column: Trading Form */}
-        <div className="space-y-3">
+        <div className={`${showChart ? 'lg:col-span-1' : 'lg:col-span-2'} space-y-3`}>
           <div className="bg-card rounded-xl p-3 shadow-sm border border-border sticky top-3">
             <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mb-3"><Activity size={12} className="text-primary" /> Trading Panel</h3>
             

@@ -285,6 +285,27 @@ const getUncontrolledHourlyPrice = (cleanSym: string, basePrice: number): number
   return parseFloat(finalPrice.toFixed(4));
 };
 
+
+const isTokenLocked = (symbol: string, adminEmail: string = 'admin'): { locked: boolean; lockedBy: string } => {
+  const cleanSym = symbol.replace('USDT', '').replace('/', '').toUpperCase();
+  const schedule = schedulesMap[cleanSym];
+  if (schedule && schedule.isActive && schedule.endTime > Date.now()) {
+    const owner = schedule.createdByAdmin || 'admin';
+    // If the person trying to edit is not the owner, it's locked
+    if (owner !== adminEmail) {
+      return { locked: true, lockedBy: owner };
+    }
+  }
+  return { locked: false, lockedBy: '' };
+};
+
+const assertNotLocked = (symbol: string, adminEmail?: string) => {
+  const lock = isTokenLocked(symbol, adminEmail || 'admin');
+  if (lock.locked) {
+    throw new Error(`Token ${symbol} is locked by an ongoing adjustment from ${lock.lockedBy}.`);
+  }
+};
+
 export const tokenPriceControl = {
   getSchedules: (): Record<string, TokenPriceSchedule> => {
     return { ...schedulesMap };
@@ -397,6 +418,7 @@ export const tokenPriceControl = {
     adminEmail?: string;
     note?: string;
   }): TokenPriceSchedule => {
+    assertNotLocked(params.symbol, params.adminEmail);
     const cleanSym = params.symbol.replace('USDT', '').replace('/', '').toUpperCase();
     const tokenMeta = SAMPLE_TOKENS_LIST.find(t => t.symbol === cleanSym);
     
@@ -465,6 +487,7 @@ export const tokenPriceControl = {
    * Instant direct price override
    */
   setManualOverride: (symbol: string, targetPrice: number, adminEmail?: string) => {
+    assertNotLocked(symbol, adminEmail);
     const cleanSym = symbol.replace('USDT', '').replace('/', '').toUpperCase();
     manualOverridesMap[cleanSym] = targetPrice;
     
@@ -510,6 +533,12 @@ export const tokenPriceControl = {
    * Reset all sample tokens to uncontrolled standard defaults
    */
   resetAllTokens: (adminEmail?: string) => {
+    const email = adminEmail || 'admin';
+    const lockedTokens = Object.values(schedulesMap).filter(sch => sch.isActive && sch.endTime > Date.now() && (sch.createdByAdmin || 'admin') !== email);
+    if (lockedTokens.length > 0) {
+      throw new Error(`Cannot reset all: ${lockedTokens.map(t=>t.symbol).join(', ')} are locked by other admins.`);
+    }
+
     schedulesMap = {};
     manualOverridesMap = {};
     saveSchedules();
@@ -528,6 +557,7 @@ export const tokenPriceControl = {
     adminEmail?: string;
   }) => {
     params.symbols.forEach(sym => {
+      assertNotLocked(sym, params.adminEmail);
       const cleanSym = sym.replace('USDT', '').replace('/', '').toUpperCase();
       const meta = SAMPLE_TOKENS_LIST.find(t => t.symbol === cleanSym);
       const startP = meta?.defaultPrice || 100;
