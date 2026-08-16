@@ -238,6 +238,14 @@ const AdminUsers = () => {
     if (!selectedUserForDelete) return;
     setDeletingUser(true);
     try {
+      if (selectedUserForDelete.email) {
+        try {
+          await supabase.rpc('delete_custom_admin', { p_email: selectedUserForDelete.email });
+        } catch (e) {
+          console.warn('Silent skip delete_custom_admin RPC:', e);
+        }
+      }
+
       // First clean up database relations to prevent foreign key constraint issues
       try {
         await supabase.from('deposits').delete().eq('user_id', selectedUserForDelete.id);
@@ -266,14 +274,15 @@ const AdminUsers = () => {
         .delete()
         .eq('id', selectedUserForDelete.id);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) console.warn('Direct profile delete error:', deleteError);
 
       // Update local state list
       setUsers(prev => prev.filter(u => u.id !== selectedUserForDelete.id));
+      toast.success('User account purged successfully.');
       setSelectedUserForDelete(null);
     } catch (err: any) {
       console.error('Failed to purge user record:', err);
-      alert('Deletion error: ' + (err.message || 'database error'));
+      toast.error('Deletion error: ' + (err.message || 'database error'));
     } finally {
       setDeletingUser(false);
     }

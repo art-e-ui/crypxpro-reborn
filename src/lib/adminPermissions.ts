@@ -394,18 +394,7 @@ export interface AdminWalletConfig {
 const REFERRALS_KEY = 'crypx_user_referrals_v2';
 const ADMIN_WALLETS_KEY = 'crypx_admin_wallets_v1';
 
-export const DEFAULT_USER_REFERRALS: UserReferral[] = [
-  {
-    userEmail: 'rickhutman77@gmail.com',
-    referredByAdminId: 'CXPAD-002',
-    referredAt: '2025-01-01T00:00:00.000Z'
-  },
-  {
-    userEmail: 'annaxiang926@gmail.com',
-    referredByAdminId: 'CXPAD-002',
-    referredAt: '2025-01-01T00:00:00.000Z'
-  }
-];
+export const DEFAULT_USER_REFERRALS: UserReferral[] = [];
 
 export function getAdminReferralCode(adminIdOrAccountOrEmail: string | CustomAccount | null | undefined): string {
   if (!adminIdOrAccountOrEmail) return '';
@@ -519,6 +508,43 @@ export function getReferralCodeForCurrentUser(email: string | undefined): string
 }
 
 // User referrals management
+export function isTestOrE2EAccount(item: string | { email?: string | null; username?: string | null } | null | undefined): boolean {
+  if (!item) return false;
+  const email = typeof item === 'string' ? item : item.email;
+  const username = typeof item === 'object' ? item.username : undefined;
+  
+  if (email) {
+    const e = email.toLowerCase().trim();
+    if (
+      e.startsWith('e2e-') ||
+      e.startsWith('e2e_') ||
+      e.includes('@crypxpro-e2e.test') ||
+      e.includes('-e2e.') ||
+      e.startsWith('testuser') ||
+      e.startsWith('tester178684') ||
+      e.startsWith('comp_test_') ||
+      e.startsWith('test_admin_trig_') ||
+      e.startsWith('test_normal_') ||
+      e.startsWith('diagnostic_') ||
+      e.startsWith('admin_test_') ||
+      e.startsWith('brandnewadmin_') ||
+      e === 'testuser@example.com' ||
+      e === 'testuserspecial@example.com'
+    ) {
+      return true;
+    }
+  }
+
+  if (username) {
+    const u = username.toLowerCase().trim();
+    if (u === 'e2e tester' || u.startsWith('e2e-') || u.startsWith('e2e_')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function getUserReferrals(): UserReferral[] {
   const stored = localStorage.getItem(REFERRALS_KEY);
   let referrals: UserReferral[] = [];
@@ -530,12 +556,17 @@ export function getUserReferrals(): UserReferral[] {
     }
   }
 
+  // Filter out any known test accounts created during development or e2e tests
+  referrals = referrals.filter(r => !isTestOrE2EAccount(r.userEmail));
+
   // Ensure default seeded user referrals are present
   DEFAULT_USER_REFERRALS.forEach(def => {
     const normDefEmail = def.userEmail.toLowerCase().trim();
-    const existingIdx = referrals.findIndex(r => r.userEmail.toLowerCase().trim() === normDefEmail);
-    if (existingIdx === -1) {
-      referrals.push(def);
+    if (!isTestOrE2EAccount(normDefEmail)) {
+      const existingIdx = referrals.findIndex(r => r.userEmail.toLowerCase().trim() === normDefEmail);
+      if (existingIdx === -1) {
+        referrals.push(def);
+      }
     }
   });
 
@@ -610,14 +641,16 @@ export function getAdminIdForCurrentUser(email: string | undefined): string | nu
 }
 
 // Filter lists of data based on the active admin's group
-export function filterUsersByAdminGroup<T extends { id?: string; user_id?: string; email?: string }>(
+export function filterUsersByAdminGroup<T extends { id?: string; user_id?: string; email?: string; username?: string | null }>(
   items: T[], 
   currentAdminId: string | null
 ): T[] {
-  if (!currentAdminId) return items; // Owners get all items
+  // Always filter out test and e2e accounts from any administrative views
+  const nonTestItems = items.filter(item => !isTestOrE2EAccount(item));
+  if (!currentAdminId) return nonTestItems; // Owners get all non-test items
   const normCurrentAdmin = normalizeAdminId(currentAdminId);
   
-  return items.filter(item => {
+  return nonTestItems.filter(item => {
     // Determine the user identifier
     const email = item.email;
     const userId = item.user_id || item.id;
