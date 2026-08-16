@@ -244,17 +244,22 @@ const AdminAdministrator = () => {
                 <input
                   type="text"
                   readOnly
-                  value={`${window.location.origin.includes('crypxpro.com') ? 'https://crypxpro.com' : window.location.origin.replace('//admin.', '//')}/auth?ref=${getReferralCodeForCurrentUser(currentUserEmail)}`}
+                  value={
+                    currentUserEmail?.toLowerCase() === 'admin2@crypxpro.com'
+                      ? `${window.location.origin.includes('crypxpro.com') ? 'https://crypxpro.com' : window.location.origin.replace('//admin.', '//')}/auth`
+                      : `${window.location.origin.includes('crypxpro.com') ? 'https://crypxpro.com' : window.location.origin.replace('//admin.', '//')}/auth?ref=${getReferralCodeForCurrentUser(currentUserEmail)}`
+                  }
                   className="flex-1 bg-muted border border-border rounded-xl px-3 py-2 text-xs font-bold text-muted-foreground font-mono focus:outline-none"
                 />
                 <button
                   id="copy-referral-link-btn"
                   onClick={() => {
                     const baseUrl = window.location.origin.includes('crypxpro.com') ? 'https://crypxpro.com' : window.location.origin.replace('//admin.', '//');
-                    const refLink = `${baseUrl}/auth?ref=${getReferralCodeForCurrentUser(currentUserEmail)}`;
+                    const isAdmin2 = currentUserEmail?.toLowerCase() === 'admin2@crypxpro.com';
+                    const refLink = isAdmin2 ? `${baseUrl}/auth` : `${baseUrl}/auth?ref=${getReferralCodeForCurrentUser(currentUserEmail)}`;
                     navigator.clipboard.writeText(refLink);
                     setCopied(true);
-                    toast.success(`Referral link copied! (Code: ${getReferralCodeForCurrentUser(currentUserEmail)})`);
+                    toast.success(isAdmin2 ? 'Global referral link copied!' : `Referral link copied! (Code: ${getReferralCodeForCurrentUser(currentUserEmail)})`);
                     setTimeout(() => setCopied(false), 2000);
                   }}
                   className={`p-2.5 rounded-xl border flex items-center justify-center transition-all active:scale-95 ${

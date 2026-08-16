@@ -65,7 +65,11 @@ export const SpotOrderForm: React.FC<SpotOrderFormProps> = ({
         setAmountInput(calculatedAmount.toFixed(6));
       }
     } else {
-      const calculatedAmount = availableBaseAsset * (pct / 100);
+      let calculatedAmount = availableBaseAsset * (pct / 100);
+      if (pct === 100) {
+        // Deduct a tiny reserved amount (0.15% cushion) anonymously for price changes in delay time
+        calculatedAmount = availableBaseAsset * 0.9985;
+      }
       setAmountInput(calculatedAmount.toFixed(6));
       setTotalInput((calculatedAmount * currentPrice).toFixed(2));
     }
@@ -86,19 +90,34 @@ export const SpotOrderForm: React.FC<SpotOrderFormProps> = ({
       return;
     }
 
+    let finalAmount = amount;
+    let finalTotal = totalUsdt;
+
+    if (side === 'SELL') {
+      // If the user wants to sell their entire holdings (percentage === 100 or amount >= 99.9% of full balance)
+      // we anonymously deduct a tiny reserve cushion (0.15%) in the background to handle price feed delays and precision variances
+      if (percentage === 100 || amount >= availableBaseAsset * 0.999) {
+        const reserveRatio = 0.0015; // 0.15% safety reserve
+        const safeMax = availableBaseAsset * (1 - reserveRatio);
+        if (finalAmount > safeMax) {
+          finalAmount = Number(safeMax.toFixed(6));
+          finalTotal = Number((finalAmount * currentPrice).toFixed(2));
+        }
+      }
+    }
+
     setIsSubmitting(true);
     try {
       await onExecuteTrade({
         side,
         type: orderType,
         price: orderType === 'MARKET' ? ticker.lastPrice : currentPrice,
-        amount,
-        total: totalUsdt
+        amount: finalAmount,
+        total: finalTotal
       });
 
       // Reset inputs after trade
       setAmountInput('');
-              setTotalInput('');
       setTotalInput('');
       setPercentage(0);
     } finally {

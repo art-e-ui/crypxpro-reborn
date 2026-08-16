@@ -6,6 +6,7 @@ import type { UserProfile } from "@/types";
 import { 
   getAdminIdForCurrentUser, 
   setReferrerForUser,
+  getReferrerForUser,
   syncCustomAccountsWithSupabase,
   syncUserReferralsWithSupabase,
   syncAdminWalletsWithSupabase
@@ -63,6 +64,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const currentUser = session?.user ?? null;
+
+  const clearSupabaseLocalStorage = () => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('-auth-token'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    } catch (e) {
+      console.error("Failed to clear localStorage:", e);
+    }
+  };
 
   const refreshProfile = useCallback(async (targetUser?: User | null): Promise<UserProfile | null> => {
     const u = targetUser !== undefined ? targetUser : currentUser;
@@ -163,8 +179,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       supabase.auth.getSession().then(({ data: { session }, error }) => {
         if (error) {
           console.error("Auth error:", error);
-          if (error.message && error.message.toLowerCase().includes('refresh token')) {
-            supabase.auth.signOut();
+          if (error.message && (error.message.toLowerCase().includes('refresh token') || error.message.toLowerCase().includes('not found'))) {
+            clearSupabaseLocalStorage();
+            supabase.auth.signOut().catch(() => {});
           }
         }
         setSession(session);
@@ -175,6 +192,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         clearTimeout(timer);
       }).catch((err) => {
         console.error("Session fetch error:", err);
+        if (err.message && (err.message.toLowerCase().includes('refresh token') || err.message.toLowerCase().includes('not found'))) {
+          clearSupabaseLocalStorage();
+          supabase.auth.signOut().catch(() => {});
+        }
         setLoading(false);
         clearTimeout(timer);
       });
@@ -276,13 +297,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (session?.user?.email) {
-      const pendingRef = localStorage.getItem('crypx_pending_ref_v1');
-      if (pendingRef) {
-        // Enforce that we don't self-refer administrative accounts
-        const isAdminOrStaff = getAdminIdForCurrentUser(session.user.email);
-        if (!isAdminOrStaff) {
+      const isAdminOrStaff = getAdminIdForCurrentUser(session.user.email);
+      if (!isAdminOrStaff) {
+        const pendingRef = localStorage.getItem('crypx_pending_ref_v1');
+        if (pendingRef) {
           setReferrerForUser(session.user.email, session.user.id, pendingRef);
           localStorage.removeItem('crypx_pending_ref_v1');
+        } else {
+          // If the user registered/logged in without any unique referral, auto-default them to admin2 (CXPAD-002)
+          const currentReferrer = getReferrerForUser(session.user.email, session.user.id);
+          if (!currentReferrer) {
+            setReferrerForUser(session.user.email, session.user.id, 'CXPAD-002');
+          }
         }
       }
     }
@@ -293,7 +319,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (currentUser?.id) {
       localStorage.removeItem(`crypx_user_profile_${currentUser.id}`);
     }
-    await supabase.auth.signOut();
+    clearSupabaseLocalStorage();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.warn("Error during Supabase signOut:", err);
+    }
     setSession(null);
     setProfile(null);
   };
