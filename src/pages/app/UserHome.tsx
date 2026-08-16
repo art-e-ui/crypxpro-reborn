@@ -20,6 +20,11 @@ import { SupportChatModal } from '@/components/shared/SupportChatModal';
 import { CryptoIcon } from '@/components/shared/CryptoIcon';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
+import futuresBannerImg from '@/assets/images/futures_hero_banner_1786696873345.jpg';
+import marketBannerImg from '@/assets/images/market_hero_banner_1786696884288.jpg';
+import securityBannerImg from '@/assets/images/security_hero_banner_1786696894651.jpg';
+import earnBannerImg from '@/assets/images/earn_hero_banner_1786696906104.jpg';
+
 const TOP_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT'];
 
 
@@ -39,7 +44,7 @@ const PromoSlideshow = ({ onOpenKyc }: { onOpenKyc?: () => void }) => {
   const navigate = useNavigate();
   const slides = [
     {
-      src: "/slide-futures.jpg",
+      src: futuresBannerImg,
       tag: "PERPETUAL CONTRACTS",
       title: "Futures Pro Trading",
       subtitle: "Up to 100x Leverage • Ultra-Low Latency • Deep Liquidity",
@@ -50,7 +55,7 @@ const PromoSlideshow = ({ onOpenKyc }: { onOpenKyc?: () => void }) => {
       btnColor: "bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20"
     },
     {
-      src: "/slide-spot.jpg",
+      src: marketBannerImg,
       tag: "SPOT & COMMODITIES",
       title: "Zero-Fee Spot Markets",
       subtitle: "Trade Top Cryptos, Tech Indices & Gold with Instant Settlement",
@@ -61,7 +66,7 @@ const PromoSlideshow = ({ onOpenKyc }: { onOpenKyc?: () => void }) => {
       btnColor: "bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/20"
     },
     {
-      src: "/security-vault.jpg",
+      src: securityBannerImg,
       tag: "ACCOUNT VERIFICATION",
       title: "Bank-Grade Security & KYC",
       subtitle: "Verify ID in minutes to unlock unlimited withdrawals & VIP perks",
@@ -73,7 +78,7 @@ const PromoSlideshow = ({ onOpenKyc }: { onOpenKyc?: () => void }) => {
       btnColor: "bg-cyan-500 hover:bg-cyan-400 text-black shadow-cyan-500/20"
     },
     {
-      src: "/slide-earn.jpg",
+      src: earnBannerImg,
       tag: "PASSIVE CRYPTO YIELD",
       title: "CrypX Earn & Staking",
       subtitle: "Earn up to 18.5% APY with flexible terms and daily payouts",
