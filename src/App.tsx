@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/Tooltip.tsx";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { RouteSEO } from "@/components/shared/SEO.tsx";
 import Landing from "@/pages/Landing.tsx";
 import Authentication from "@/pages/Authentication.tsx";
 import PageNotFound from "@/pages/PageNotFound.tsx";
@@ -47,6 +48,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <RouteSEO />
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Landing />} />

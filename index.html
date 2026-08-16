@@ -3,11 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CrypX-Pro® — Next-Gen Crypto Trading Platform</title>
-    <meta name="description" content="CrypX-Pro is a next-generation cryptocurrency trading platform built for performance, security, and simplicity. Spot, Futures, and Earn simulation all in one platform." />
+    <title>CrypX-Pro® — Next-Gen Crypto Trading & Financial Simulation Platform</title>
+    <meta name="description" content="CrypX-Pro is a next-generation cryptocurrency trading platform built for institutional performance, security, and precision. Trade Spot, Futures up to 125x, and high-yield Earn pools in one unified ecosystem." />
+    <meta name="keywords" content="crypto trading, cryptocurrency exchange, spot trading, bitcoin futures, perpetual contracts, 125x leverage, crypto earn, high yield staking, tradefi" />
     <meta name="author" content="CrypX-Pro" />
     <link rel="canonical" href="https://crypxpro.com" />
 
+    <!-- Favicons & App Icons -->
     <link rel="icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/icons/icon-180x180.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
@@ -15,29 +17,93 @@
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://crypxpro.com" />
-    <meta property="og:title" content="CrypX-Pro® — Next-Gen Crypto Trading Platform" />
-    <meta property="og:description" content="Trade smarter with zero fees. Spot, Futures, and Earn simulation — all in one platform." />
-    <meta property="og:image" content="https://crypxpro.com/logo-full.png" />
+    <meta property="og:url" content="https://crypxpro.com/" />
     <meta property="og:site_name" content="CrypX-Pro" />
+    <meta property="og:title" content="CrypX-Pro® — Next-Gen Crypto Trading Platform" />
+    <meta property="og:description" content="Trade digital assets with institutional precision. Sub-millisecond Spot order books, 125x Perpetual Futures, and High-Yield Earn Staking." />
+    <meta property="og:image" content="https://crypxpro.com/logo-full-highres.png" />
+    <meta property="og:image:secure_url" content="https://crypxpro.com/logo-full-highres.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CrypX-Pro Crypto Trading Hub - Spot, Futures, and Earn" />
+    <meta property="og:locale" content="en_US" />
 
-    <!-- Twitter -->
+    <!-- Twitter / X Cards -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@CrypXPro" />
+    <meta name="twitter:creator" content="@CrypXPro" />
     <meta name="twitter:title" content="CrypX-Pro® — Next-Gen Crypto Trading Platform" />
-    <meta name="twitter:description" content="Trade smarter with zero fees. Spot, Futures, and Earn simulation — all in one platform." />
-    <meta name="twitter:image" content="https://crypxpro.com/logo-full.png" />
+    <meta name="twitter:description" content="Trade digital assets with institutional precision. Sub-millisecond Spot order books, 125x Perpetual Futures, and High-Yield Earn Staking." />
+    <meta name="twitter:image" content="https://crypxpro.com/logo-full-highres.png" />
+    <meta name="twitter:image:alt" content="CrypX-Pro Cryptocurrency Exchange" />
 
-    <!-- Security & Contact Metadata -->
+    <!-- Security, Verification & Search Engine Directives -->
     <meta name="contact" content="admin@crypxpro.com" />
-    <meta name="robots" content="index, follow" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
     <meta name="wot-verification" content="a9a137f5562f96845844" />
+    <meta name="theme-color" content="#0B0E14" />
+    <link rel="manifest" href="/manifest.json" />
 
     <!-- Web of Trust (WOT) Verification & Badge Script -->
     <script async src="https://static.mywot.com/website_owners_badges/websiteOwnersBadge.js"></script>
 
-    <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#2563EB" />
+    <!-- Structured Data (JSON-LD) for Rich Search Results -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://crypxpro.com/#website",
+          "url": "https://crypxpro.com/",
+          "name": "CrypX-Pro",
+          "description": "Next-Generation Cryptocurrency Spot, Perpetual Futures, and Staking Earn Platform",
+          "publisher": {
+            "@id": "https://crypxpro.com/#organization"
+          },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://crypxpro.com/app/market?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://crypxpro.com/#organization",
+          "name": "CrypX-Pro",
+          "url": "https://crypxpro.com/",
+          "logo": "https://crypxpro.com/logo-full-highres.png",
+          "sameAs": [
+            "https://twitter.com/CrypXPro"
+          ],
+          "contactPoint": {
+            "@type": "ContactPoint",
+            "email": "admin@crypxpro.com",
+            "contactType": "customer service"
+          }
+        },
+        {
+          "@type": "SoftwareApplication",
+          "name": "CrypX-Pro Spot & Futures Trading Hub",
+          "operatingSystem": "Web, Android, iOS",
+          "applicationCategory": "FinanceApplication",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "featureList": [
+            "Ultra-low latency Spot order execution with live order books",
+            "Perpetual Futures contracts with up to 125x leverage and TP/SL automation",
+            "Flexible and Locked Earn Staking Vaults with daily compounded APY",
+            "Real-time institutional candlestick charts and multi-asset depth scanner"
+          ]
+        }
+      ]
+    }
+    </script>
+
     <script>
       window.__RUNTIME_CONFIG__ = {
         VITE_SUPABASE_URL: "__VITE_SUPABASE_URL__",
