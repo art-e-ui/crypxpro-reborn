@@ -11,11 +11,11 @@ interface RouteMeta {
 
 const ROUTE_SEO_MAP: Record<string, RouteMeta> = {
   "/": {
-    title: "CrypX-Pro® — Next-Gen Crypto Trading & Financial Simulation Platform",
-    description: "Experience institutional-grade cryptocurrency spot trading, high-leverage futures, and high-yield staking with zero latency.",
+    title: "CrypX-Pro® — Next-Gen Crypto Spot, 125x Futures & Financial Simulation Hub",
+    description: "CrypX-Pro provides institutional cryptocurrency spot trading, up to 125x perpetual futures simulation, and high-yield staking vaults with real-time market liquidity.",
     image: "https://crypxpro.com/logo-full-highres.png",
     url: "https://crypxpro.com/",
-    keywords: "crypto trading, bitcoin exchange, cryptocurrency spot, perpetual futures, crypto staking, defi earn"
+    keywords: "crypto trading, cryptocurrency exchange, spot trading, bitcoin futures, perpetual contracts, 125x leverage, crypto earn, staking vaults, financial simulation"
   },
   "/auth": {
     title: "Sign In / Register — CrypX-Pro® Secure Crypto Gateway",
