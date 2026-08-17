@@ -25,6 +25,8 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const channelRef = useRef<any>(null);
+
   useEffect(() => {
     if (!user || !isOpen) return;
 
@@ -43,9 +45,9 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
     
     loadMessages();
 
-    // Subscribe to new messages
+    // Subscribe to both PostgreSQL changes and instant WebSocket broadcast events
     const channel = supabase
-      .channel('user_support_messages')
+      .channel('support-chat-broadcast')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
@@ -56,19 +58,41 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
         setMessages(prev => {
           const isDuplicate = prev.some(m => 
             m.id === newMsg.id || 
-            (m.id.startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type)
+            (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type)
           );
           if (isDuplicate) {
             // Replace our local optimistic temp message with the actual database-persisted message
-            return prev.map(m => (m.id.startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type) ? newMsg : m);
+            return prev.map(m => (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type) ? newMsg : m);
           }
           return [...prev, newMsg];
         });
       })
+      .on('broadcast', { event: 'new_msg' }, payload => {
+        const newMsg = payload.payload as Message;
+        if (newMsg.user_id === user.id) {
+          setMessages(prev => {
+            const isDuplicate = prev.some(m => 
+              m.id === newMsg.id || 
+              (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type)
+            );
+            if (isDuplicate) {
+              return prev.map(m => (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type) ? newMsg : m);
+            }
+            return [...prev, newMsg];
+          });
+        }
+      })
       .subscribe();
+
+    channelRef.current = channel;
+
+    // Fast fallback polling interval (1.5s) to guarantee absolute reliability even under spotty network connections
+    const pollInterval = setInterval(loadMessages, 1500);
 
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
+      clearInterval(pollInterval);
     };
   }, [user, isOpen]);
 
@@ -95,13 +119,27 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
     setMessages(prev => [...prev, msgTemplate]);
     
     try {
-      const { error } = await supabase.from('support_messages').insert({
+      const { data, error } = await supabase.from('support_messages').insert({
         user_id: msgTemplate.user_id,
         sender_type: msgTemplate.sender_type,
         message: msgTemplate.message,
         created_at: msgTemplate.created_at
-      });
+      }).select().single();
+      
       if (error) throw error;
+      
+      if (data) {
+        setMessages(prev => prev.map(m => m.id === msgTemplate.id ? (data as Message) : m));
+        
+        // Instantly broadcast the message so the administrator receives it with sub-millisecond latency
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'new_msg',
+            payload: data
+          }).catch(console.error);
+        }
+      }
     } catch (error) {
       console.error('Failed to send', error);
       // Clean up the optimistic message if database persistence fails
@@ -148,6 +186,15 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
       if (insertError) throw insertError;
       if (insertedMsg) {
         setMessages(prev => [...prev, insertedMsg as Message]);
+        
+        // Instantly broadcast the image message to the admin portal
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'new_msg',
+            payload: insertedMsg
+          }).catch(console.error);
+        }
       }
     } catch (err) {
       console.error('Support upload error:', err);

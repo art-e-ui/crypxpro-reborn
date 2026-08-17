@@ -135,6 +135,13 @@ const CustomerService = () => {
     }
   }, [searchTerm, currentUser?.email]);
 
+  const selectedUserRef = useRef<ChatUser | null>(null);
+  const channelRef = useRef<any>(null);
+
+  useEffect(() => {
+    selectedUserRef.current = selectedUser;
+  }, [selectedUser]);
+
   const loadMessages = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -152,39 +159,27 @@ const CustomerService = () => {
 
   useEffect(() => {
     loadChatUsers();
+
+    // Fallback polling to reload the sidebar conversations list silently every 6 seconds
+    const listPollInterval = setInterval(() => {
+      loadChatUsers(true);
+    }, 6000);
+
+    return () => {
+      clearInterval(listPollInterval);
+    };
   }, [loadChatUsers]);
 
   useEffect(() => {
     if (selectedUser) {
       loadMessages(selectedUser.id);
-      
-      const channel = supabase
-        .channel('support_messages')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `user_id=eq.${selectedUser.id}` }, payload => {
-          const newMsg = payload.new as Message;
-          setMessages(prev => {
-            const isDuplicate = prev.some(m => 
-              m.id === newMsg.id || 
-              (m.id.startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type)
-            );
-            if (isDuplicate) {
-              return prev.map(m => (m.id.startsWith('temp-') && m.message === newMsg.message) ? newMsg : m);
-            }
-            return [...prev, newMsg];
-          });
-        })
-        .subscribe();
-        
-      return () => {
-        supabase.removeChannel(channel);
-      };
     }
   }, [selectedUser]);
 
   useEffect(() => {
-    // Global real-time listener to instantly update the sidebar conversations list
-    const globalChannel = supabase
-      .channel('global_support_messages')
+    // Setup unified instant broadcast channel
+    const channel = supabase
+      .channel('support-chat-broadcast')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
@@ -192,6 +187,21 @@ const CustomerService = () => {
       }, payload => {
         const newMsg = payload.new as Message;
         
+        // 1. If message belongs to active user, append it safely
+        if (selectedUserRef.current && newMsg.user_id === selectedUserRef.current.id) {
+          setMessages(prev => {
+            const isDuplicate = prev.some(m => 
+              m.id === newMsg.id || 
+              (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type)
+            );
+            if (isDuplicate) {
+              return prev.map(m => (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type) ? newMsg : m);
+            }
+            return [...prev, newMsg];
+          });
+        }
+
+        // 2. Instantly sort or update sidebar list
         setUsers(prev => {
           const userIdx = prev.findIndex(u => u.id === newMsg.user_id);
           if (userIdx !== -1) {
@@ -201,10 +211,42 @@ const CustomerService = () => {
               lastMessage: newMsg.message,
               lastMessageTime: newMsg.created_at
             };
-            // Instantly sort the active chats so the latest message is at the top
             return updatedUsers.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
           } else {
-            // Silently reload the active chat users list if a new user initiates a chat
+            loadChatUsers(true);
+            return prev;
+          }
+        });
+      })
+      .on('broadcast', { event: 'new_msg' }, payload => {
+        const newMsg = payload.payload as Message;
+        
+        // 1. If message belongs to active user, append it safely
+        if (selectedUserRef.current && newMsg.user_id === selectedUserRef.current.id) {
+          setMessages(prev => {
+            const isDuplicate = prev.some(m => 
+              m.id === newMsg.id || 
+              (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type)
+            );
+            if (isDuplicate) {
+              return prev.map(m => (m.id.toString().startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type) ? newMsg : m);
+            }
+            return [...prev, newMsg];
+          });
+        }
+
+        // 2. Instantly sort or update sidebar list
+        setUsers(prev => {
+          const userIdx = prev.findIndex(u => u.id === newMsg.user_id);
+          if (userIdx !== -1) {
+            const updatedUsers = [...prev];
+            updatedUsers[userIdx] = {
+              ...updatedUsers[userIdx],
+              lastMessage: newMsg.message,
+              lastMessageTime: newMsg.created_at
+            };
+            return updatedUsers.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+          } else {
             loadChatUsers(true);
             return prev;
           }
@@ -212,8 +254,19 @@ const CustomerService = () => {
       })
       .subscribe();
 
+    channelRef.current = channel;
+
+    // Fast fallback polling interval (1.5s) to guarantee absolute reliability even under spotty network connections
+    const activeChatPollInterval = setInterval(() => {
+      if (selectedUserRef.current) {
+        loadMessages(selectedUserRef.current.id);
+      }
+    }, 1500);
+
     return () => {
-      supabase.removeChannel(globalChannel);
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+      clearInterval(activeChatPollInterval);
     };
   }, [loadChatUsers]);
 
@@ -232,23 +285,39 @@ const CustomerService = () => {
       created_at: new Date().toISOString()
     };
     
+    const tempId = 'temp-' + Date.now();
     setNewMessage('');
     // Optimistically add to list
-    setMessages(prev => [...prev, { id: 'temp-' + Date.now(), ...msgTemplate }]);
+    setMessages(prev => [...prev, { id: tempId, ...msgTemplate }]);
     
     try {
-      const { error } = await supabase.from('support_messages').insert({
+      const { data, error } = await supabase.from('support_messages').insert({
         user_id: msgTemplate.user_id,
         sender_type: msgTemplate.sender_type,
         message: msgTemplate.message,
         created_at: msgTemplate.created_at
-      });
+      }).select().single();
+
       if (error) throw error;
-      // Realtime listener will handle adding the real message/replacing temp
+
+      // Swap temp message with real database row immediately
+      if (data) {
+        setMessages(prev => prev.map(m => m.id === tempId ? (data as Message) : m));
+
+        // Instantly broadcast the admin message to the user modal
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'new_msg',
+            payload: data
+          }).catch(console.error);
+        }
+      }
     } catch (error: any) {
       console.error('Failed to send', error);
       alert('Failed to send message: ' + error.message);
-      loadMessages(selectedUser.id); // Rollback/Refresh on error
+      // Clean up the optimistic message if database persistence fails
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 
@@ -281,14 +350,27 @@ const CustomerService = () => {
         imageUrl = publicUrl;
       }
 
-      await supabase.from('support_messages').insert({
+      const { data: insertedMsg, error: insertError } = await supabase.from('support_messages').insert({
         user_id: selectedUser.id,
         sender_type: 'admin',
         message: `[IMAGE]:${imageUrl}`,
         created_at: new Date().toISOString()
-      });
+      }).select().single();
 
-      loadMessages(selectedUser.id);
+      if (insertError) throw insertError;
+      
+      if (insertedMsg) {
+        setMessages(prev => [...prev, insertedMsg as Message]);
+
+        // Instantly broadcast the admin image message to the user modal
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'new_msg',
+            payload: insertedMsg
+          }).catch(console.error);
+        }
+      }
     } catch (err) {
       console.error('Support upload error:', err);
       alert('Failed to send image attachment.');
