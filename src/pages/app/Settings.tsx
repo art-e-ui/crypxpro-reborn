@@ -3,10 +3,14 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   FileText, Shield, HeadphonesIcon, HelpCircle, AlertTriangle, CheckCircle,
   ChevronRight, Lock, Eye, Bell, Globe, ArrowLeft, ExternalLink, Info,
-  Scale, BookOpen, ShieldCheck, UserCheck, Terminal, HeartHandshake, Sparkles
+  Scale, BookOpen, ShieldCheck, UserCheck, Terminal, HeartHandshake, Sparkles,
+  Trash2, AlertCircle, X, LogOut
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { deleteUserAccountComplete } from '@/lib/adminPermissions';
+import { TermlyPrivacyPolicy } from '@/components/shared/TermlyPrivacyPolicy';
 
 interface SettingsProps {
   initialTab?: string;
@@ -15,12 +19,44 @@ interface SettingsProps {
 export const Settings = ({ initialTab: propInitialTab }: SettingsProps) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   // Tab management: 'overview' | 'terms' | 'policies' | 'faq'
   const initialTab = searchParams.get('tab') || propInitialTab || 'overview';
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [faqSearch, setFaqSearch] = useState('');
+
+  // User Self Account Deletion State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [userDeleteReason, setUserDeleteReason] = useState('No longer using the simulation platform');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleUserAccountDelete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (deleteConfirmText.trim().toLowerCase() !== 'delete') {
+      toast.error("Please type 'DELETE' to confirm account erasure.");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const res = await deleteUserAccountComplete(user.id, user.email || undefined);
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+      toast.success("Your account and all associated data have been permanently deleted.");
+      setIsDeleteModalOpen(false);
+      await signOut();
+      navigate('/');
+    } catch (err: any) {
+      console.error("Account deletion failed:", err);
+      toast.error("Account deletion failed: " + (err.message || 'Unknown error'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   useEffect(() => {
     const tabFromUrl = searchParams.get('tab');
@@ -258,6 +294,35 @@ export const Settings = ({ initialTab: propInitialTab }: SettingsProps) => {
                   </button>
                 </div>
               </div>
+
+              {/* Danger Zone: Account Deletion & Right to Erasure */}
+              <div className="pt-6 border-t border-border/80">
+                <div className="p-5 sm:p-6 rounded-2xl bg-rose-500/[0.04] border border-rose-500/20 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-rose-500 font-bold text-sm">
+                        <Trash2 size={18} />
+                        <h4>Account Erasure & Permanent Deletion</h4>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
+                        Permanently purge your account, profile credentials, simulated trading balances, deposit/withdrawal history, and active sessions from our database (GDPR Right to Erasure).
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteConfirmText('');
+                        setIsDeleteModalOpen(true);
+                      }}
+                      className="px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 rounded-xl text-xs font-bold transition-colors whitespace-nowrap self-start sm:self-center flex items-center gap-2"
+                    >
+                      <Trash2 size={14} />
+                      Delete Account
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -333,53 +398,7 @@ export const Settings = ({ initialTab: propInitialTab }: SettingsProps) => {
         {/* Tab 3: User Policies & Developer Safeguards */}
         {activeTab === 'policies' && (
           <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 space-y-6 shadow-sm animate-fade-in">
-            <div className="flex items-center gap-3 border-b border-border pb-4">
-              <Scale className="text-primary" size={24} />
-              <div>
-                <h3 className="text-lg font-bold">User Policies & Developer Safeguards</h3>
-                <p className="text-xs text-muted-foreground">Privacy, Transparency, Risk Warnings & Legal Exemption</p>
-              </div>
-            </div>
-
-            <div className="space-y-6 text-sm text-muted-foreground leading-relaxed">
-              
-              <div className="p-4 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive-foreground space-y-2">
-                <h4 className="font-extrabold text-red-400 flex items-center gap-2">
-                  <ShieldCheck size={18} /> FULL DEVELOPER & OPERATOR LIABILITY EXEMPTION
-                </h4>
-                <p className="text-xs text-red-300/90 leading-relaxed">
-                  <strong>IMPORTANT LEGAL NOTICE:</strong> By registering, signing up, or interacting with CrypX-Pro, the user agrees that the software development team, independent developers, software authors, and platform operators are completely exempt from any liability, claims, financial damages, legal disputes, or losses. The application does not solicit, hold, or process real money or financial assets.
-                </p>
-              </div>
-
-              <section className="space-y-2">
-                <h4 className="font-bold text-foreground text-base">1. Scamadviser & Google Play Store Compliance Declaration</h4>
-                <p>
-                  This application is published with 100% transparency. It does not engage in real financial transactions, high-yield investment programs (HYIP), automated trading advice, or gambling. All functionality is designed for educational exploration and software evaluation.
-                </p>
-              </section>
-
-              <section className="space-y-2">
-                <h4 className="font-bold text-foreground text-base">2. Privacy & Data Handling Policy</h4>
-                <p>
-                  We value user privacy. Profile credentials (such as email and display name) are stored strictly to manage user session preferences and authenticated state. No personal data is shared with third-party advertisers or sold to data brokers.
-                </p>
-              </section>
-
-              <section className="space-y-2">
-                <h4 className="font-bold text-foreground text-base">3. Simulated Identity Verification (KYC) Policy</h4>
-                <p>
-                  Identity documents uploaded in the demo KYC section are processed solely to simulate compliance workflows for educational evaluation. Users are advised not to upload sensitive unmasked personal identity documentation unless testing simulated workflows.
-                </p>
-              </section>
-
-              <section className="space-y-2">
-                <h4 className="font-bold text-foreground text-base">4. Prohibited Misuse Policy</h4>
-                <p>
-                  Users agree not to attempt to reverse engineer, misrepresent the application as a licensed financial institution, or use the platform for unlawful activities, market misrepresentation, or fraudulent claims.
-                </p>
-              </section>
-            </div>
+            <TermlyPrivacyPolicy />
           </div>
         )}
 
@@ -436,6 +455,89 @@ export const Settings = ({ initialTab: propInitialTab }: SettingsProps) => {
         )}
 
       </div>
+
+      {/* Account Deletion Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <form onSubmit={handleUserAccountDelete} className="bg-card w-full max-w-md rounded-[28px] p-6 shadow-2xl relative border border-rose-500/20 animate-scale-in">
+            <button 
+              type="button" 
+              onClick={() => setIsDeleteModalOpen(false)} 
+              className="absolute right-4 top-4 p-2 hover:bg-muted rounded-full text-muted-foreground transition-colors"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center border border-rose-500/20">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Delete Account Permanently</h3>
+                <p className="text-xs text-muted-foreground">Self-service GDPR data erasure</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border text-xs space-y-2">
+                <div className="flex justify-between font-mono">
+                  <span className="text-muted-foreground">Account Identifier:</span>
+                  <span className="font-bold text-foreground">{user?.email || 'Logged In User'}</span>
+                </div>
+                <p className="text-muted-foreground leading-relaxed pt-2 border-t border-border/40">
+                  This action is <strong className="text-rose-400 font-bold">permanent and irreversible</strong>. All your simulated spot and futures balances, order book history, deposit/withdrawal records, and preferences will be permanently wiped.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">Reason for Deletion (Optional)</label>
+                <select
+                  value={userDeleteReason}
+                  onChange={(e) => setUserDeleteReason(e.target.value)}
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="Completed demo trading curriculum">Completed demo trading curriculum</option>
+                  <option value="No longer using the simulation platform">No longer using the simulation platform</option>
+                  <option value="Switching to a different training environment">Switching to a different training environment</option>
+                  <option value="Privacy & data minimization preference">Privacy & data minimization preference</option>
+                  <option value="Other reason">Other reason</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-foreground mb-1.5">
+                  To confirm deletion, type <span className="font-mono text-rose-500 font-bold">DELETE</span> below:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Type DELETE to confirm"
+                  className="w-full bg-card border border-border rounded-xl px-3 py-2.5 text-xs font-mono text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/40"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="flex-1 py-3 border border-border rounded-xl text-foreground font-bold hover:bg-muted/80 transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isDeleting || deleteConfirmText.trim().toLowerCase() !== 'delete'}
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm shadow-md flex items-center justify-center gap-2"
+              >
+                {isDeleting ? 'Deleting...' : 'Permanently Delete'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

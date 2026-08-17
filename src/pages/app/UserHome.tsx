@@ -19,6 +19,7 @@ import { AnimatedBalance } from '@/components/shared/AnimatedBalance';
 import { SupportChatModal } from '@/components/shared/SupportChatModal';
 import { CryptoIcon } from '@/components/shared/CryptoIcon';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { getReferrerForUser } from '@/lib/adminPermissions';
 
 import futuresBannerImg from '@/assets/images/futures_hero_banner_1786696873345.jpg';
 import marketBannerImg from '@/assets/images/market_hero_banner_1786696884288.jpg';
@@ -529,9 +530,46 @@ const UserHome = () => {
       });
     });
 
-    supabase.from('support_config').select('*').limit(1).single().then(({ data }) => {
-      if (data) setSupportInfo(data as any);
-    }).catch(() => {});
+    // Load per-admin support config
+    const fetchSupportConfig = async () => {
+      try {
+        const assignedAdminId = getReferrerForUser(user?.email, user?.id) || 'OWNER';
+        
+        const { data, error } = await supabase.from('support_config').select('*');
+        if (!error && data && data.length > 0) {
+          // 1. Try relational if admin_id is present
+          const matchedRow = data.find((r: any) => r.admin_id === assignedAdminId || r.adminId === assignedAdminId);
+          if (matchedRow) {
+            setSupportInfo(matchedRow as any);
+            return;
+          }
+
+          // 2. Try global serialized row
+          const globalRow = data.find((r: any) => r.email === 'global_support_configs@crypxpro.com');
+          if (globalRow && globalRow.telegram) {
+            try {
+              const allConfigs = JSON.parse(globalRow.telegram);
+              if (allConfigs[assignedAdminId]) {
+                setSupportInfo(allConfigs[assignedAdminId]);
+                return;
+              }
+            } catch (e) {
+              // ignore
+            }
+          }
+
+          // 3. Fallback to system default row (the first row or any row that isn't the global config row)
+          const defaultRow = data.find((r: any) => r.email !== 'global_support_configs@crypxpro.com') || data[0];
+          if (defaultRow) {
+            setSupportInfo(defaultRow as any);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load per-admin support configurations:", err);
+      }
+    };
+
+    fetchSupportConfig();
 
     // Refresh prices periodically
     const priceInterval = setInterval(fetchPrices, 3000);

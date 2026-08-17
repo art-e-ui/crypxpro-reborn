@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, MessageCircle, Phone, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
 import CubeSpinner from '@/components/shared/CubeSpinner';
+import { useAuth } from '@/hooks/useAuth';
+import { getAdminIdForCurrentUser } from '@/lib/adminPermissions';
 
 const AdminSupport = () => {
   const [formData, setFormData] = useState({ email: '', telegram: '', whatsapp: '' });
@@ -10,38 +12,172 @@ const AdminSupport = () => {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [configId, setConfigId] = useState<string | null>(null);
+  const [globalConfigId, setGlobalConfigId] = useState<string | null>(null);
+  const { user } = useAuth();
 
   const loadData = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fetchError } = await supabase.from('support_config').select('*').limit(1).maybeSingle();
+      const adminId = getAdminIdForCurrentUser(user.email) || 'OWNER';
+      
+      const { data, error: fetchError } = await supabase.from('support_config').select('*');
       if (fetchError) throw fetchError;
-      if (data) {
-        setFormData({ email: data.email || '', telegram: data.telegram || '', whatsapp: data.whatsapp || '' });
-        setConfigId(data.id);
+      
+      if (data && data.length > 0) {
+        // 1. Try to find if there is a row that explicitly matches currentAdminId relationally
+        const matchedRow = data.find((r: any) => r.admin_id === adminId || r.adminId === adminId);
+        if (matchedRow) {
+          setFormData({
+            email: matchedRow.email || '',
+            telegram: matchedRow.telegram || '',
+            whatsapp: matchedRow.whatsapp || ''
+          });
+          setConfigId(matchedRow.id);
+          return;
+        }
+
+        // 2. Try to find the global serialized configurations row
+        const globalRow = data.find((r: any) => r.email === 'global_support_configs@crypxpro.com');
+        if (globalRow) {
+          setGlobalConfigId(globalRow.id);
+          if (globalRow.telegram) {
+            try {
+              const allConfigs = JSON.parse(globalRow.telegram);
+              if (allConfigs[adminId]) {
+                setFormData({
+                  email: allConfigs[adminId].email || '',
+                  telegram: allConfigs[adminId].telegram || '',
+                  whatsapp: allConfigs[adminId].whatsapp || ''
+                });
+                return;
+              }
+            } catch (e) {
+              console.warn("Error parsing serialized support configs:", e);
+            }
+          }
+        }
+
+        // 3. Fallback: load system default from the first non-global row
+        const defaultRow = data.find((r: any) => r.email !== 'global_support_configs@crypxpro.com') || data[0];
+        if (defaultRow) {
+          if (adminId === 'OWNER') {
+            setFormData({
+              email: defaultRow.email || '',
+              telegram: defaultRow.telegram || '',
+              whatsapp: defaultRow.whatsapp || ''
+            });
+            setConfigId(defaultRow.id);
+          } else {
+            // New admin, initialize with custom defaults
+            setFormData({
+              email: `support-${adminId.toLowerCase()}@crypxpro.com`,
+              telegram: '',
+              whatsapp: ''
+            });
+          }
+        }
+      } else {
+        // No configs in table yet, create placeholder defaults
+        setFormData({
+          email: 'support@crypxpro.com',
+          telegram: '',
+          whatsapp: ''
+        });
       }
     } catch (err: any) {
       setError(err.message || "Failed to load support config.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setSaving(true);
-    if (configId) {
-      await supabase.from('support_config').update(formData).eq('id', configId);
-    } else {
-      const { data } = await supabase.from('support_config').insert(formData).select().single();
-      if (data) setConfigId(data.id);
+    setError(null);
+    setSuccess(false);
+
+    // Enforce email domain validation: must strictly end with @crypxpro.com
+    const emailLower = formData.email.trim().toLowerCase();
+    if (!emailLower.endsWith('@crypxpro.com')) {
+      setError("Support email must strictly belong to the @crypxpro.com domain (e.g. xxxxxxxx@crypxpro.com)");
+      setSaving(false);
+      return;
     }
-    setSaving(false);
-    setSuccess(true);
-    setTimeout(() => setSuccess(false), 3000);
+
+    try {
+      const adminId = getAdminIdForCurrentUser(user.email) || 'OWNER';
+
+      // Load all rows to preserve maps of other admins
+      const { data: allRows, error: fetchError } = await supabase.from('support_config').select('*');
+      if (fetchError) throw fetchError;
+
+      const globalRow = allRows?.find((r: any) => r.email === 'global_support_configs@crypxpro.com');
+      let currentMap: Record<string, any> = {};
+      if (globalRow && globalRow.telegram) {
+        try {
+          currentMap = JSON.parse(globalRow.telegram);
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Update current admin's configurations
+      currentMap[adminId] = {
+        email: formData.email.trim(),
+        telegram: formData.telegram.trim(),
+        whatsapp: formData.whatsapp.trim()
+      };
+
+      // Save global map serialization
+      if (globalRow) {
+        const { error: updErr } = await supabase
+          .from('support_config')
+          .update({
+            telegram: JSON.stringify(currentMap),
+            whatsapp: 'Serialized admin support configurations'
+          })
+          .eq('id', globalRow.id);
+        if (updErr) throw updErr;
+      } else {
+        const { data: newRow, error: insErr } = await supabase
+          .from('support_config')
+          .insert({
+            email: 'global_support_configs@crypxpro.com',
+            telegram: JSON.stringify(currentMap),
+            whatsapp: 'Serialized admin support configurations'
+          })
+          .select()
+          .single();
+        if (insErr) throw insErr;
+        if (newRow) setGlobalConfigId(newRow.id);
+      }
+
+      // If OWNER, also synchronize standard columns of the default legacy row for backward compatibility
+      const defaultRow = allRows?.find((r: any) => r.email !== 'global_support_configs@crypxpro.com');
+      if (defaultRow && adminId === 'OWNER') {
+        await supabase
+          .from('support_config')
+          .update({
+            email: formData.email.trim(),
+            telegram: formData.telegram.trim(),
+            whatsapp: formData.whatsapp.trim()
+          })
+          .eq('id', defaultRow.id);
+      }
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message || "Failed to save support config.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -58,6 +194,12 @@ const AdminSupport = () => {
           </div>
         ) : (
           <form onSubmit={handleSave} className="p-6 space-y-6">
+            {error && (
+              <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive-foreground text-xs sm:text-sm flex items-start gap-2.5">
+                <AlertCircle className="text-red-500 mt-0.5 shrink-0" size={16} />
+                <span>{error}</span>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="col-span-1 md:col-span-2">
                 <label className="block text-sm font-bold text-foreground mb-2">Support Email</label>

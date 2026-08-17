@@ -33,8 +33,8 @@ const CustomerService = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadChatUsers = useCallback(async () => {
-    setLoading(true);
+  const loadChatUsers = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       // 1. Fetch conversations (users with existing messages)
       const { data: allMessages, error: msgError } = await supabase
@@ -131,9 +131,9 @@ const CustomerService = () => {
     } catch (error) {
       console.error("Chat users load error:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [searchTerm]);
+  }, [searchTerm, currentUser?.email]);
 
   const loadMessages = async (userId: string) => {
     try {
@@ -180,6 +180,42 @@ const CustomerService = () => {
       };
     }
   }, [selectedUser]);
+
+  useEffect(() => {
+    // Global real-time listener to instantly update the sidebar conversations list
+    const globalChannel = supabase
+      .channel('global_support_messages')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'support_messages' 
+      }, payload => {
+        const newMsg = payload.new as Message;
+        
+        setUsers(prev => {
+          const userIdx = prev.findIndex(u => u.id === newMsg.user_id);
+          if (userIdx !== -1) {
+            const updatedUsers = [...prev];
+            updatedUsers[userIdx] = {
+              ...updatedUsers[userIdx],
+              lastMessage: newMsg.message,
+              lastMessageTime: newMsg.created_at
+            };
+            // Instantly sort the active chats so the latest message is at the top
+            return updatedUsers.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+          } else {
+            // Silently reload the active chat users list if a new user initiates a chat
+            loadChatUsers(true);
+            return prev;
+          }
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(globalChannel);
+    };
+  }, [loadChatUsers]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

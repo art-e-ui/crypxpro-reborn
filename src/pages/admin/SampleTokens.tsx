@@ -550,24 +550,51 @@ export const AdminSampleTokens = () => {
                       {/* Trend & Progress */}
                       <td className="py-4 px-4">
                         {sch && sch.isActive ? (
-                          <div className="space-y-1.5 max-w-xs">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className={`font-semibold flex items-center gap-1 ${
-                                isDecreasing ? 'text-rose-400' : 'text-emerald-400'
-                              }`}>
-                                {isDecreasing ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />}
-                                {isDecreasing ? '-' : '+'}{sch.changePercent}% ({sch.durationHours >= 24 ? `${(sch.durationHours/24).toFixed(1)}d` : `${sch.durationHours}h`})
-                              </span>
-                              <span className="text-gray-400 font-mono">
-                                Target: ${sch.targetPrice.toFixed(2)}
-                              </span>
-                            </div>
-
-                            {/* Progress bar */}
-                            {(() => {
-                              const controlledData = tokenPriceControl.getControlledPrice(token.symbol, currentPrice);
-                              const progressPct = controlledData.progress ?? 0;
+                          (() => {
+                            const controlledData = tokenPriceControl.getControlledPrice(token.symbol, currentPrice);
+                            const isReturning = controlledData.isReturning;
+                            const progressPct = controlledData.progress ?? 0;
+                            
+                            if (isReturning) {
                               return (
+                                <div className="space-y-1.5 max-w-xs animate-fade-in">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-semibold flex items-center gap-1.5 text-amber-400">
+                                      <RotateCcw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '3s' }} />
+                                      Returning to Base Price
+                                    </span>
+                                    <span className="text-gray-400 font-mono">
+                                      Base: ${token.defaultPrice.toFixed(2)}
+                                    </span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                    <div 
+                                      className="h-full bg-amber-500 animate-pulse"
+                                      style={{ width: '100%' }}
+                                    />
+                                  </div>
+                                  <div className="text-[10px] text-gray-400 flex justify-between">
+                                    <span>Gradual Return (1-4hr random)</span>
+                                    <span>Safe Recovery</span>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div className="space-y-1.5 max-w-xs">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className={`font-semibold flex items-center gap-1 ${
+                                    isDecreasing ? 'text-rose-400' : 'text-emerald-400'
+                                  }`}>
+                                    {isDecreasing ? <TrendingDown className="w-3.5 h-3.5" /> : <TrendingUp className="w-3.5 h-3.5" />}
+                                    {isDecreasing ? '-' : '+'}{sch.changePercent}% ({sch.durationHours >= 24 ? `${(sch.durationHours/24).toFixed(1)}d` : `${sch.durationHours}h`})
+                                  </span>
+                                  <span className="text-gray-400 font-mono">
+                                    Target: ${sch.targetPrice.toFixed(2)}
+                                  </span>
+                                </div>
+
                                 <div className="space-y-1">
                                   <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
                                     <div 
@@ -580,9 +607,9 @@ export const AdminSampleTokens = () => {
                                     <span>{sch.note || 'Active'}</span>
                                   </div>
                                 </div>
-                              );
-                            })()}
-                          </div>
+                              </div>
+                            );
+                          })()
                         ) : hasOverride ? (
                           <span className="px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-medium">
                             Instant Price Override Active

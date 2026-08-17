@@ -327,53 +327,88 @@ export const tokenPriceControl = {
   /**
    * Main calculated price retriever for market service & live tickers
    */
-  getControlledPrice: (symbol: string, currentFallbackPrice: number): { price: number; isControlled: boolean; progress?: number; targetPrice?: number } => {
+  getControlledPrice: (symbol: string, currentFallbackPrice: number): { price: number; isControlled: boolean; progress?: number; targetPrice?: number; isReturning?: boolean } => {
     const cleanSym = symbol.replace('USDT', '').replace('/', '').toUpperCase();
+
+    // Helper to calculate return duration deterministically if not stored
+    const getReturnDuration = (sch: TokenPriceSchedule) => {
+      if (sch.returnDurationHours !== undefined) return sch.returnDurationHours;
+      let hash = 0;
+      for (let i = 0; i < sch.id.length; i++) {
+        hash = (hash << 5) - hash + sch.id.charCodeAt(i);
+        hash |= 0;
+      }
+      const raw = (Math.abs(Math.sin(hash)) * 1000) % 3; // 0 to 3
+      return 1 + raw; // 1 to 4 hours
+    };
 
     // 1. Check if there is an active schedule
     const schedule = schedulesMap[cleanSym];
     if (schedule && schedule.isActive) {
       const now = Date.now();
       
-      if (now <= schedule.startTime) {
+      const returnDurationHours = getReturnDuration(schedule);
+      const returnDurationMs = returnDurationHours * 3600 * 1000;
+      const returnEndTime = schedule.endTime + returnDurationMs;
+
+      if (now >= returnEndTime) {
+        // Complete returning to base! Deactivate and transition to standard uncontrolled state
+        schedule.isActive = false;
+        // Delete safely in a timeout block to prevent react warnings or context locks during ticker ticks
+        setTimeout(() => {
+          if (schedulesMap[cleanSym] && !schedulesMap[cleanSym].isActive) {
+            delete schedulesMap[cleanSym];
+            saveSchedules();
+          }
+        }, 10);
+      } else if (now <= schedule.startTime) {
         return {
           price: schedule.startPrice,
           isControlled: true,
           progress: 0,
           targetPrice: schedule.targetPrice
         };
-      }
+      } else if (now > schedule.endTime) {
+        // Gradually returning to base price within 1 to 4 hours randomly
+        const elapsedSinceFulfilled = now - schedule.endTime;
+        const returnRatio = Math.min(1, Math.max(0, elapsedSinceFulfilled / returnDurationMs));
+        const tokenMeta = SAMPLE_TOKENS_LIST.find(t => t.symbol === cleanSym);
+        const returnBasePrice = tokenMeta?.defaultPrice || schedule.startPrice;
+        
+        // Linear smooth interpolation from targetPrice back to base defaultPrice
+        const rawPrice = schedule.targetPrice + (returnBasePrice - schedule.targetPrice) * returnRatio;
+        
+        // Add subtle micro tick noise (± 0.03%) so chart candles and tickers move smoothly
+        const noise = (Math.random() * 0.0006) - 0.0003;
+        const tickPrice = Math.max(0.0001, rawPrice * (1 + noise));
 
-      const totalDuration = schedule.endTime - schedule.startTime;
-      if (totalDuration <= 0 || now >= schedule.endTime) {
-        // Target time reached! Small ±0.04% natural fluctuation around target
-        const noise = (Math.random() * 0.0008) - 0.0004;
-        const finalPrice = Math.max(0.0001, schedule.targetPrice * (1 + noise));
         return {
-          price: parseFloat(finalPrice.toFixed(4)),
+          price: parseFloat(tickPrice.toFixed(4)),
           isControlled: true,
-          progress: 100,
+          progress: 100, // Trend is fully fulfilled
+          targetPrice: returnBasePrice,
+          isReturning: true
+        };
+      } else {
+        // Active trend phase
+        const totalDuration = schedule.endTime - schedule.startTime;
+        const elapsedTime = now - schedule.startTime;
+        const progressRatio = Math.min(1, Math.max(0, elapsedTime / totalDuration));
+        
+        // Interpolate price linearly from startPrice to targetPrice
+        const rawPrice = schedule.startPrice + (schedule.targetPrice - schedule.startPrice) * progressRatio;
+        
+        // Add subtle micro tick noise (± 0.03%) so chart candles and tickers move smoothly
+        const noise = (Math.random() * 0.0006) - 0.0003;
+        const tickPrice = Math.max(0.0001, rawPrice * (1 + noise));
+
+        return {
+          price: parseFloat(tickPrice.toFixed(4)),
+          isControlled: true,
+          progress: Math.round(progressRatio * 100),
           targetPrice: schedule.targetPrice
         };
       }
-
-      // Elapsed ratio [0 .. 1]
-      const elapsedTime = now - schedule.startTime;
-      const progressRatio = Math.min(1, Math.max(0, elapsedTime / totalDuration));
-      
-      // Interpolate price linearly from startPrice to targetPrice
-      const rawPrice = schedule.startPrice + (schedule.targetPrice - schedule.startPrice) * progressRatio;
-      
-      // Add subtle micro tick noise (± 0.03%) so chart candles and tickers move smoothly
-      const noise = (Math.random() * 0.0006) - 0.0003;
-      const tickPrice = Math.max(0.0001, rawPrice * (1 + noise));
-
-      return {
-        price: parseFloat(tickPrice.toFixed(4)),
-        isControlled: true,
-        progress: Math.round(progressRatio * 100),
-        targetPrice: schedule.targetPrice
-      };
     }
 
     // 2. Check if manual instant override exists
@@ -445,6 +480,9 @@ export const tokenPriceControl = {
     const durationMs = effectiveHours * 3600 * 1000;
     const endTime = startTime + durationMs;
 
+    // Generate random return duration between 1.0 and 4.0 hours for the recovery phase
+    const returnDurationHours = 1 + Math.random() * 3;
+
     const newSchedule: TokenPriceSchedule = {
       id: `sch_${cleanSym}_${Date.now()}`,
       symbol: cleanSym,
@@ -460,7 +498,8 @@ export const tokenPriceControl = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdByAdmin: params.adminEmail || 'admin',
-      note: params.note || ''
+      note: params.note || '',
+      returnDurationHours
     };
 
     schedulesMap[cleanSym] = newSchedule;

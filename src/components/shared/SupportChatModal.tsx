@@ -54,8 +54,13 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
       }, payload => {
         const newMsg = payload.new as Message;
         setMessages(prev => {
-          if (prev.some(m => m.id === newMsg.id || (m.sender_type === newMsg.sender_type && m.message === newMsg.message && Math.abs(new Date(m.created_at).getTime() - new Date(newMsg.created_at).getTime()) < 5000))) {
-            return prev;
+          const isDuplicate = prev.some(m => 
+            m.id === newMsg.id || 
+            (m.id.startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type)
+          );
+          if (isDuplicate) {
+            // Replace our local optimistic temp message with the actual database-persisted message
+            return prev.map(m => (m.id.startsWith('temp-') && m.message === newMsg.message && m.sender_type === newMsg.sender_type) ? newMsg : m);
           }
           return [...prev, newMsg];
         });
@@ -77,22 +82,30 @@ export const SupportChatModal = ({ isOpen, onClose }: SupportChatModalProps) => 
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
     
-    const msgTemplate = {
+    const msgTemplate: Message = {
+      id: 'temp-' + Date.now(),
       user_id: user.id,
       sender_type: 'user',
-      message: newMessage.trim()
+      message: newMessage.trim(),
+      created_at: new Date().toISOString()
     };
     
     setNewMessage('');
+    // Render the message instantly for a seamless, ultra-fast chat experience
+    setMessages(prev => [...prev, msgTemplate]);
     
     try {
       const { error } = await supabase.from('support_messages').insert({
-        ...msgTemplate,
-        created_at: new Date().toISOString()
+        user_id: msgTemplate.user_id,
+        sender_type: msgTemplate.sender_type,
+        message: msgTemplate.message,
+        created_at: msgTemplate.created_at
       });
       if (error) throw error;
     } catch (error) {
       console.error('Failed to send', error);
+      // Clean up the optimistic message if database persistence fails
+      setMessages(prev => prev.filter(m => m.id !== msgTemplate.id));
     }
   };
 
