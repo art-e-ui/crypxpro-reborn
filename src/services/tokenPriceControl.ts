@@ -16,6 +16,10 @@ export interface TokenPriceSchedule {
   updatedAt: string;
   createdByAdmin?: string;
   note?: string;
+  returnDurationHours?: number;
+  returnInitiatedAt?: number; // Timestamp in ms when admin clicked manual return
+  returnStartPrice?: number; // Price when manual return was initiated
+  returnBasePrice?: number; // Target base price to return to
 }
 
 export interface TokenPriceAuditLog {
@@ -327,70 +331,91 @@ export const tokenPriceControl = {
   /**
    * Main calculated price retriever for market service & live tickers
    */
-  getControlledPrice: (symbol: string, currentFallbackPrice: number): { price: number; isControlled: boolean; progress?: number; targetPrice?: number; isReturning?: boolean } => {
+  getControlledPrice: (symbol: string, currentFallbackPrice: number): {
+    price: number;
+    isControlled: boolean;
+    progress?: number;
+    targetPrice?: number;
+    isReturning?: boolean;
+    isIdleAtTarget?: boolean;
+    returnProgress?: number;
+    returnDurationHours?: number;
+    returnTimeRemainingMs?: number;
+  } => {
     const cleanSym = symbol.replace('USDT', '').replace('/', '').toUpperCase();
-
-    // Helper to calculate return duration deterministically if not stored
-    const getReturnDuration = (sch: TokenPriceSchedule) => {
-      if (sch.returnDurationHours !== undefined) return sch.returnDurationHours;
-      let hash = 0;
-      for (let i = 0; i < sch.id.length; i++) {
-        hash = (hash << 5) - hash + sch.id.charCodeAt(i);
-        hash |= 0;
-      }
-      const raw = (Math.abs(Math.sin(hash)) * 1000) % 3; // 0 to 3
-      return 1 + raw; // 1 to 4 hours
-    };
 
     // 1. Check if there is an active schedule
     const schedule = schedulesMap[cleanSym];
     if (schedule && schedule.isActive) {
       const now = Date.now();
       
-      const returnDurationHours = getReturnDuration(schedule);
-      const returnDurationMs = returnDurationHours * 3600 * 1000;
-      const returnEndTime = schedule.endTime + returnDurationMs;
+      // Check if return to base was manually initiated by admin
+      if (schedule.returnInitiatedAt) {
+        const returnDurationHours = schedule.returnDurationHours || 2;
+        const returnDurationMs = returnDurationHours * 3600 * 1000;
+        const elapsedSinceReturn = now - schedule.returnInitiatedAt;
 
-      if (now >= returnEndTime) {
-        // Complete returning to base! Deactivate and transition to standard uncontrolled state
-        schedule.isActive = false;
-        // Delete safely in a timeout block to prevent react warnings or context locks during ticker ticks
-        setTimeout(() => {
-          if (schedulesMap[cleanSym] && !schedulesMap[cleanSym].isActive) {
-            delete schedulesMap[cleanSym];
-            saveSchedules();
-          }
-        }, 10);
+        if (elapsedSinceReturn >= returnDurationMs) {
+          // Complete returning to base! Deactivate and transition to standard uncontrolled state
+          schedule.isActive = false;
+          // Delete safely in a timeout block to prevent react warnings or context locks during ticker ticks
+          setTimeout(() => {
+            if (schedulesMap[cleanSym] && !schedulesMap[cleanSym].isActive) {
+              delete schedulesMap[cleanSym];
+              saveSchedules();
+            }
+          }, 10);
+        } else {
+          // Gradually returning to base price over the 1 to 4 hours return window
+          const returnRatio = Math.min(1, Math.max(0, elapsedSinceReturn / returnDurationMs));
+          const tokenMeta = SAMPLE_TOKENS_LIST.find(t => t.symbol === cleanSym);
+          const fromPrice = schedule.returnStartPrice !== undefined ? schedule.returnStartPrice : schedule.targetPrice;
+          const returnBasePrice = schedule.returnBasePrice !== undefined ? schedule.returnBasePrice : (tokenMeta?.defaultPrice || schedule.startPrice);
+          
+          // Linear smooth interpolation from returnStartPrice back to returnBasePrice
+          const rawPrice = fromPrice + (returnBasePrice - fromPrice) * returnRatio;
+          
+          // Add subtle micro tick noise (± 0.03%) so chart candles and tickers move smoothly
+          const noise = (Math.random() * 0.0006) - 0.0003;
+          const tickPrice = Math.max(0.0001, rawPrice * (1 + noise));
+
+          return {
+            price: parseFloat(tickPrice.toFixed(4)),
+            isControlled: true,
+            progress: 100, // Trend is fully fulfilled
+            targetPrice: returnBasePrice,
+            isReturning: true,
+            isIdleAtTarget: false,
+            returnProgress: Math.round(returnRatio * 100),
+            returnDurationHours,
+            returnTimeRemainingMs: Math.max(0, returnDurationMs - elapsedSinceReturn)
+          };
+        }
       } else if (now <= schedule.startTime) {
         return {
           price: schedule.startPrice,
           isControlled: true,
           progress: 0,
-          targetPrice: schedule.targetPrice
+          targetPrice: schedule.targetPrice,
+          isReturning: false,
+          isIdleAtTarget: false
         };
-      } else if (now > schedule.endTime) {
-        // Gradually returning to base price within 1 to 4 hours randomly
-        const elapsedSinceFulfilled = now - schedule.endTime;
-        const returnRatio = Math.min(1, Math.max(0, elapsedSinceFulfilled / returnDurationMs));
-        const tokenMeta = SAMPLE_TOKENS_LIST.find(t => t.symbol === cleanSym);
-        const returnBasePrice = tokenMeta?.defaultPrice || schedule.startPrice;
-        
-        // Linear smooth interpolation from targetPrice back to base defaultPrice
-        const rawPrice = schedule.targetPrice + (returnBasePrice - schedule.targetPrice) * returnRatio;
-        
-        // Add subtle micro tick noise (± 0.03%) so chart candles and tickers move smoothly
+      } else if (now >= schedule.endTime) {
+        // TARGET PRICE HAS BEEN REACHED (100%)!
+        // Stays IDLE around the target price with natural small fluctuations until admin manually starts return
         const noise = (Math.random() * 0.0006) - 0.0003;
-        const tickPrice = Math.max(0.0001, rawPrice * (1 + noise));
+        const tickPrice = Math.max(0.0001, schedule.targetPrice * (1 + noise));
 
         return {
           price: parseFloat(tickPrice.toFixed(4)),
           isControlled: true,
-          progress: 100, // Trend is fully fulfilled
-          targetPrice: returnBasePrice,
-          isReturning: true
+          progress: 100, // 100% completed
+          targetPrice: schedule.targetPrice,
+          isReturning: false,
+          isIdleAtTarget: true // Price will stay idle around target price until manual button click
         };
       } else {
-        // Active trend phase
+        // Active trend phase (0% to 100%)
         const totalDuration = schedule.endTime - schedule.startTime;
         const elapsedTime = now - schedule.startTime;
         const progressRatio = Math.min(1, Math.max(0, elapsedTime / totalDuration));
@@ -406,7 +431,9 @@ export const tokenPriceControl = {
           price: parseFloat(tickPrice.toFixed(4)),
           isControlled: true,
           progress: Math.round(progressRatio * 100),
-          targetPrice: schedule.targetPrice
+          targetPrice: schedule.targetPrice,
+          isReturning: false,
+          isIdleAtTarget: false
         };
       }
     }
@@ -541,6 +568,78 @@ export const tokenPriceControl = {
       `Set instant override price to $${targetPrice.toFixed(2)}`,
       adminEmail || 'admin'
     );
+  },
+
+  /**
+   * Manually trigger returning a sample token to its base price gradually (1 to 4 hours random duration)
+   */
+  startReturnToBase: (symbol: string, adminEmail?: string, customDurationHours?: number): boolean => {
+    assertNotLocked(symbol, adminEmail);
+    const cleanSym = symbol.replace('USDT', '').replace('/', '').toUpperCase();
+    const schedule = schedulesMap[cleanSym];
+    if (!schedule || !schedule.isActive) {
+      throw new Error(`Token ${cleanSym} does not have an active price adjustment to return.`);
+    }
+
+    const tokenMeta = SAMPLE_TOKENS_LIST.find(t => t.symbol === cleanSym);
+    const basePrice = tokenMeta?.defaultPrice || schedule.startPrice;
+    
+    // Get current calculated price to start return smoothly from current level
+    const currentPriceInfo = tokenPriceControl.getControlledPrice(cleanSym, schedule.targetPrice);
+    const startPriceForReturn = currentPriceInfo.price || schedule.targetPrice;
+
+    // Default to random 1 to 4 hours if not explicitly provided
+    const durationHours = customDurationHours || schedule.returnDurationHours || (1 + Math.random() * 3);
+
+    schedule.returnInitiatedAt = Date.now();
+    schedule.returnStartPrice = startPriceForReturn;
+    schedule.returnBasePrice = basePrice;
+    schedule.returnDurationHours = durationHours;
+    schedule.updatedAt = new Date().toISOString();
+
+    saveSchedules();
+
+    logAction(
+      cleanSym,
+      'START_RETURN_TO_BASE',
+      `Manually initiated gradual return from $${startPriceForReturn.toFixed(2)} to base $${basePrice.toFixed(2)} over ${durationHours.toFixed(1)} hours (1-4h random duration)`,
+      adminEmail || 'admin'
+    );
+
+    return true;
+  },
+
+  /**
+   * Cancel returning to base and hold price at current target / level
+   */
+  cancelReturnToBase: (symbol: string, adminEmail?: string) => {
+    assertNotLocked(symbol, adminEmail);
+    const cleanSym = symbol.replace('USDT', '').replace('/', '').toUpperCase();
+    const schedule = schedulesMap[cleanSym];
+    if (schedule && schedule.returnInitiatedAt) {
+      delete schedule.returnInitiatedAt;
+      delete schedule.returnStartPrice;
+      delete schedule.returnBasePrice;
+      schedule.updatedAt = new Date().toISOString();
+      saveSchedules();
+      logAction(cleanSym, 'CANCEL_RETURN_TO_BASE', `Paused/Cancelled return to base; holding at target price for ${cleanSym}`, adminEmail || 'admin');
+    }
+  },
+
+  /**
+   * Bulk start return to base for all or selected tokens currently holding at target price
+   */
+  bulkStartReturnToBase: (symbols: string[], adminEmail?: string) => {
+    symbols.forEach(sym => {
+      try {
+        const cleanSym = sym.replace('USDT', '').replace('/', '').toUpperCase();
+        if (schedulesMap[cleanSym] && schedulesMap[cleanSym].isActive) {
+          tokenPriceControl.startReturnToBase(cleanSym, adminEmail);
+        }
+      } catch (err) {
+        // Continue for other symbols if one is locked
+      }
+    });
   },
 
   /**
