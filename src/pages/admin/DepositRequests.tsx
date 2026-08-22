@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getAdminIdForCurrentUser, filterUsersByAdminGroup, syncUserReferralsWithSupabase } from '@/lib/adminPermissions';
+import { recordActivityLog } from '@/services/systemActivityLog';
 import { CryptoIcon } from '@/components/shared/CryptoIcon';
 import { Activity, RefreshCw, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import CubeSpinner from '@/components/shared/CubeSpinner';
@@ -113,6 +114,32 @@ const DepositRequests = () => {
       }
 
       setDeposits(prev => prev.filter(d => d.id !== deposit.id));
+
+      const adminEmail = currentUser?.email || 'admin@crypxpro.com';
+      const adminId = getAdminIdForCurrentUser(currentUser?.email);
+      const isApproved = action === 'APPROVED';
+
+      recordActivityLog({
+        category: 'DEPOSIT_REQUEST',
+        action: isApproved ? 'DEPOSIT_REQUEST_CONFIRMED' : 'DEPOSIT_REQUEST_REJECTED',
+        adminEmail,
+        adminId,
+        target: `${deposit.asset} (${deposit.network || 'Mainnet'})`,
+        title: isApproved ? 'Confirmed & Credited Deposit Request' : 'Rejected Deposit Request',
+        details: isApproved
+          ? `Approved deposit of ${deposit.amount} ${deposit.asset} on ${deposit.network} network for user ${deposit.user_email || deposit.user_id} and credited user balance.`
+          : `Rejected deposit request of ${deposit.amount} ${deposit.asset} for user ${deposit.user_email || deposit.user_id}.`,
+        severity: isApproved ? 'success' : 'danger',
+        metadata: {
+          depositId: deposit.id,
+          userId: deposit.user_id,
+          userEmail: deposit.user_email,
+          asset: deposit.asset,
+          network: deposit.network,
+          amount: Number(deposit.amount),
+          status: action
+        }
+      });
     } catch (err: any) {
       console.error("[DepositAction] Error:", err);
       setError("Action failed: " + (err.message || "Unknown error"));

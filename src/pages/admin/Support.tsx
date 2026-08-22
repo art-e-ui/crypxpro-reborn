@@ -4,6 +4,7 @@ import { Mail, MessageCircle, Phone, CheckCircle, RefreshCw, AlertCircle } from 
 import CubeSpinner from '@/components/shared/CubeSpinner';
 import { useAuth } from '@/hooks/useAuth';
 import { getAdminIdForCurrentUser } from '@/lib/adminPermissions';
+import { recordActivityLog } from '@/services/systemActivityLog';
 
 const AdminSupport = () => {
   const [formData, setFormData] = useState({ email: '', telegram: '', whatsapp: '' });
@@ -170,6 +171,23 @@ const AdminSupport = () => {
           })
           .eq('id', defaultRow.id);
       }
+
+      recordActivityLog({
+        category: 'SUPPORT_CONTACT',
+        action: 'SUPPORT_CONTACT_UPDATED',
+        adminEmail: user.email || 'admin@crypxpro.com',
+        adminId,
+        target: `Support Channels (${adminId})`,
+        title: 'Updated Support Contact Information',
+        details: `Updated official support channels: Email: ${formData.email.trim()} | Telegram: ${formData.telegram.trim() || 'None'} | WhatsApp: ${formData.whatsapp.trim() || 'None'}`,
+        severity: 'info',
+        metadata: {
+          adminId,
+          email: formData.email.trim(),
+          telegram: formData.telegram.trim(),
+          whatsapp: formData.whatsapp.trim()
+        }
+      });
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);

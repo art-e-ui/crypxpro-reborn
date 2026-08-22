@@ -11,7 +11,7 @@ import CubeSpinner from '@/components/shared/CubeSpinner';
 import {
   Bell, LogOut, Wallet, TrendingUp, EyeOff, Eye, FileText, Clock, ExternalLink,
   User, Shield, Lock, Settings, HeadphonesIcon, ChevronLeft, ChevronRight, Menu, X,
-  Smartphone, Mail, Key, Camera, Activity, Search, ChevronDown,
+  Mail, Key, Camera, Activity, Search, ChevronDown,
   ArrowDownToLine, ArrowUpFromLine, ArrowRightLeft
 } from 'lucide-react';
 import { Logo } from '@/components/shared/Logo';
@@ -1213,27 +1213,13 @@ const UserHome = () => {
                 <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center"><Lock size={24} /></div>
                 <div>
                   <div className="font-bold text-foreground">Security Level</div>
-                  <div className="text-sm text-muted-foreground">Medium - Enable 2FA for maximum security</div>
+                  <div className="text-sm text-muted-foreground">High - Password & Session Encryption Active</div>
                 </div>
               </div>
 
               <div>
                 <h4 className="text-sm font-bold text-foreground mb-4">Security Options</h4>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border">
-                    <div className="flex items-center gap-3">
-                      <Smartphone className="text-muted-foreground" size={20} />
-                      <div>
-                        <div className="font-bold text-foreground text-sm">Two-Factor Authentication</div>
-                        <div className="text-xs text-muted-foreground">Add an extra layer of security</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold bg-muted text-muted-foreground px-2 py-0.5 rounded">Recommended</span>
-                      <div className="w-10 h-6 bg-muted rounded-full relative cursor-pointer"><div className="absolute left-1 top-1 w-4 h-4 bg-card rounded-full shadow-sm" /></div>
-                    </div>
-                  </div>
-
                   <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border">
                     <div className="flex items-center gap-3">
                       <Mail className="text-muted-foreground" size={20} />
@@ -1551,7 +1537,7 @@ const UserHome = () => {
                 { q: 'What is futures trading?', a: 'Futures trading allows you to trade with leverage, amplifying potential gains (and losses). You can go long (buy) or short (sell) on supported pairs with leverage up to 100x.' },
                 { q: 'What is staking?', a: 'Staking lets you earn passive rewards by locking your tokens for a set period. Visit the Earn page to explore available staking plans and their APY rates.' },
                 { q: 'How do I convert between tokens?', a: 'Use the Quick Convert feature on the Spot page. Select the token pair, enter the amount, and confirm the conversion. The exchange rate is calculated in real-time.' },
-                { q: 'Is my account secure?', a: 'Yes. We implement industry-standard security measures including encrypted data storage, secure authentication, and optional two-factor authentication (2FA). We recommend enabling 2FA for maximum security.' },
+                { q: 'Is my account secure?', a: 'Yes. We implement industry-standard security measures including encrypted data storage, secure password authentication, and real-time session protection.' },
                 { q: 'How do I contact support?', a: 'Go to your Profile menu → Help & Support or email our official desk directly at admin@crypxpro.com. Support tickets are reviewed within 24–48 hours.' },
                 { q: 'What fees does CrypX-Pro charge?', a: 'We charge competitive trading fees on spot and futures trades. Deposit fees depend on the blockchain network. Detailed fee information is available on the platform.' },
               ].map((faq, i) => (

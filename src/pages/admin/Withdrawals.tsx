@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getAdminIdForCurrentUser, filterUsersByAdminGroup, syncUserReferralsWithSupabase } from '@/lib/adminPermissions';
+import { recordActivityLog } from '@/services/systemActivityLog';
 import { CryptoIcon } from '@/components/shared/CryptoIcon';
 import { ArrowUp, RefreshCw, Check, X, Filter, AlertCircle } from 'lucide-react';
 import CubeSpinner from '@/components/shared/CubeSpinner';
@@ -83,6 +84,32 @@ const AdminWithdrawals = () => {
       if (updateError) throw updateError;
       
       setWithdrawals(prev => prev.map(w => w.id === withdrawal.id ? { ...w, status: 'APPROVED' } : w));
+
+      const adminEmail = currentUser?.email || 'admin@crypxpro.com';
+      const adminId = getAdminIdForCurrentUser(currentUser?.email);
+      const userProfile = profiles[withdrawal.user_id];
+
+      recordActivityLog({
+        category: 'WITHDRAWAL_REQUEST',
+        action: 'WITHDRAWAL_REQUEST_CONFIRMED',
+        adminEmail,
+        adminId,
+        target: `${withdrawal.asset} (${withdrawal.network || 'Mainnet'})`,
+        title: 'Confirmed Withdrawal Request',
+        details: `Approved withdrawal of ${withdrawal.amount} ${withdrawal.asset} to address ${withdrawal.address} for user ${userProfile?.email || userProfile?.username || withdrawal.user_id}`,
+        severity: 'success',
+        metadata: {
+          withdrawalId: withdrawal.id,
+          userId: withdrawal.user_id,
+          userEmail: userProfile?.email,
+          username: userProfile?.username,
+          asset: withdrawal.asset,
+          network: withdrawal.network,
+          address: withdrawal.address,
+          amount: Number(withdrawal.amount),
+          status: 'APPROVED'
+        }
+      });
     } catch (err: any) {
       console.error(err);
       setError("Approval failed: " + err.message);
@@ -143,6 +170,34 @@ const AdminWithdrawals = () => {
       }
 
       setWithdrawals(prev => prev.map(w => w.id === rejectModal.id ? { ...w, status: 'REJECTED', note: rejectNote } : w));
+
+      const adminEmail = currentUser?.email || 'admin@crypxpro.com';
+      const adminId = getAdminIdForCurrentUser(currentUser?.email);
+      const userProfile = profiles[rejectModal.user_id];
+
+      recordActivityLog({
+        category: 'WITHDRAWAL_REQUEST',
+        action: 'WITHDRAWAL_REQUEST_REJECTED',
+        adminEmail,
+        adminId,
+        target: `${rejectModal.asset} (${rejectModal.network || 'Mainnet'})`,
+        title: 'Rejected Withdrawal Request & Refunded Balance',
+        details: `Rejected withdrawal of ${rejectModal.amount} ${rejectModal.asset} for user ${userProfile?.email || userProfile?.username || rejectModal.user_id}. Refunded balance to user. Reason: "${rejectNote || 'No reason provided'}"`,
+        severity: 'danger',
+        metadata: {
+          withdrawalId: rejectModal.id,
+          userId: rejectModal.user_id,
+          userEmail: userProfile?.email,
+          username: userProfile?.username,
+          asset: rejectModal.asset,
+          network: rejectModal.network,
+          address: rejectModal.address,
+          amount: Number(rejectModal.amount),
+          status: 'REJECTED',
+          reason: rejectNote
+        }
+      });
+
       setRejectModal(null);
       setRejectNote('');
     } catch (err: any) {

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { recordActivityLog } from '@/services/systemActivityLog';
 
 export interface TokenPriceSchedule {
   id: string;
@@ -546,6 +547,26 @@ export const tokenPriceControl = {
       params.adminEmail || 'admin'
     );
 
+    recordActivityLog({
+      category: 'PRICE_CONTROL',
+      action: 'TOKEN_PRICE_TREND_SCHEDULED',
+      adminEmail: params.adminEmail || 'admin',
+      target: `${cleanSym}/USDT`,
+      title: 'Scheduled Token Price Trend',
+      details: `Scheduled ${dirText} of ${pctText} from $${baseStartPrice.toFixed(2)} to target $${target.toFixed(2)} over ${durText}`,
+      severity: 'warning',
+      metadata: {
+        symbol: cleanSym,
+        direction: params.direction,
+        type: params.type,
+        startPrice: baseStartPrice,
+        targetPrice: target,
+        changePercent: params.changePercent,
+        durationHours: effectiveHours,
+        note: params.note
+      }
+    });
+
     return newSchedule;
   },
 
@@ -568,6 +589,20 @@ export const tokenPriceControl = {
       `Set instant override price to $${targetPrice.toFixed(2)}`,
       adminEmail || 'admin'
     );
+
+    recordActivityLog({
+      category: 'PRICE_CONTROL',
+      action: 'TOKEN_PRICE_MANUAL_OVERRIDE',
+      adminEmail: adminEmail || 'admin',
+      target: `${cleanSym}/USDT`,
+      title: 'Instant Manual Price Override',
+      details: `Set instant override price for ${cleanSym} to $${targetPrice.toFixed(2)}`,
+      severity: 'warning',
+      metadata: {
+        symbol: cleanSym,
+        targetPrice
+      }
+    });
   },
 
   /**
@@ -606,6 +641,22 @@ export const tokenPriceControl = {
       adminEmail || 'admin'
     );
 
+    recordActivityLog({
+      category: 'PRICE_CONTROL',
+      action: 'TOKEN_RETURN_TO_BASE_TRIGGERED',
+      adminEmail: adminEmail || 'admin',
+      target: `${cleanSym}/USDT`,
+      title: 'Manual Return to Base Triggered',
+      details: `Initiated gradual return from $${startPriceForReturn.toFixed(2)} to base $${basePrice.toFixed(2)} over ${durationHours.toFixed(1)} hours`,
+      severity: 'info',
+      metadata: {
+        symbol: cleanSym,
+        fromPrice: startPriceForReturn,
+        basePrice,
+        returnDurationHours: durationHours
+      }
+    });
+
     return true;
   },
 
@@ -623,6 +674,17 @@ export const tokenPriceControl = {
       schedule.updatedAt = new Date().toISOString();
       saveSchedules();
       logAction(cleanSym, 'CANCEL_RETURN_TO_BASE', `Paused/Cancelled return to base; holding at target price for ${cleanSym}`, adminEmail || 'admin');
+      
+      recordActivityLog({
+        category: 'PRICE_CONTROL',
+        action: 'TOKEN_PRICE_SCHEDULE_CANCELLED',
+        adminEmail: adminEmail || 'admin',
+        target: `${cleanSym}/USDT`,
+        title: 'Cancelled Return to Base',
+        details: `Cancelled return to base; holding at target price for ${cleanSym}`,
+        severity: 'info',
+        metadata: { symbol: cleanSym }
+      });
     }
   },
 
@@ -630,16 +692,31 @@ export const tokenPriceControl = {
    * Bulk start return to base for all or selected tokens currently holding at target price
    */
   bulkStartReturnToBase: (symbols: string[], adminEmail?: string) => {
+    const successSymbols: string[] = [];
     symbols.forEach(sym => {
       try {
         const cleanSym = sym.replace('USDT', '').replace('/', '').toUpperCase();
         if (schedulesMap[cleanSym] && schedulesMap[cleanSym].isActive) {
           tokenPriceControl.startReturnToBase(cleanSym, adminEmail);
+          successSymbols.push(cleanSym);
         }
       } catch (err) {
         // Continue for other symbols if one is locked
       }
     });
+
+    if (successSymbols.length > 0) {
+      recordActivityLog({
+        category: 'PRICE_CONTROL',
+        action: 'TOKEN_BULK_RETURN_TO_BASE',
+        adminEmail: adminEmail || 'admin',
+        target: `${successSymbols.length} Tokens`,
+        title: 'Bulk Return to Base Triggered',
+        details: `Initiated bulk gradual return to base for tokens: ${successSymbols.join(', ')}`,
+        severity: 'info',
+        metadata: { symbols: successSymbols }
+      });
+    }
   },
 
   /**
@@ -652,6 +729,17 @@ export const tokenPriceControl = {
       delete schedulesMap[cleanSym];
       saveSchedules();
       logAction(cleanSym, 'CANCEL_SCHEDULE', `Cancelled active trend schedule for ${cleanSym}`, adminEmail || 'admin');
+      
+      recordActivityLog({
+        category: 'PRICE_CONTROL',
+        action: 'TOKEN_PRICE_SCHEDULE_CANCELLED',
+        adminEmail: adminEmail || 'admin',
+        target: `${cleanSym}/USDT`,
+        title: 'Cancelled Active Trend Schedule',
+        details: `Cancelled active trend schedule for ${cleanSym}`,
+        severity: 'info',
+        metadata: { symbol: cleanSym }
+      });
     }
   },
 
@@ -665,6 +753,17 @@ export const tokenPriceControl = {
     saveSchedules();
     saveOverrides();
     logAction(cleanSym, 'RESET_DEFAULT', `Reset ${cleanSym} to default market calculation`, adminEmail || 'admin');
+
+    recordActivityLog({
+      category: 'PRICE_CONTROL',
+      action: 'TOKEN_PRICE_RESET',
+      adminEmail: adminEmail || 'admin',
+      target: `${cleanSym}/USDT`,
+      title: 'Reset Token Price Control',
+      details: `Reset ${cleanSym} to default dynamic calculation`,
+      severity: 'info',
+      metadata: { symbol: cleanSym }
+    });
   },
 
   /**
@@ -682,6 +781,16 @@ export const tokenPriceControl = {
     saveSchedules();
     saveOverrides();
     logAction('ALL', 'RESET_ALL', 'Reset all sample tokens to standard uncontrolled defaults', adminEmail || 'admin');
+
+    recordActivityLog({
+      category: 'PRICE_CONTROL',
+      action: 'TOKEN_PRICE_RESET',
+      adminEmail: adminEmail || 'admin',
+      target: 'ALL_SAMPLE_TOKENS',
+      title: 'Reset All Sample Tokens',
+      details: 'Reset all sample tokens to standard uncontrolled defaults',
+      severity: 'warning'
+    });
   },
 
   /**

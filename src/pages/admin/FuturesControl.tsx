@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { getAdminIdForCurrentUser, filterUsersByAdminGroup, syncUserReferralsWithSupabase } from '@/lib/adminPermissions';
+import { recordActivityLog } from '@/services/systemActivityLog';
 import { Search, TrendingUp, DollarSign, Users, RefreshCw, AlertCircle } from 'lucide-react';
 import CubeSpinner from '@/components/shared/CubeSpinner';
 
@@ -66,14 +67,34 @@ const FuturesControl = () => {
       force_loss: outcome === 'loss'
     };
     
-    const currentUser = users.find(u => u.id === userId);
-    if (currentUser && currentUser.force_win === updates.force_win && currentUser.force_loss === updates.force_loss) return;
+    const targetUser = users.find(u => u.id === userId);
+    if (targetUser && targetUser.force_win === updates.force_win && targetUser.force_loss === updates.force_loss) return;
 
     setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
     
     try {
       const { error: updateError } = await supabase.from('profiles').update(updates).eq('id', userId);
       if (updateError) throw updateError;
+
+      const adminEmail = currentUser?.email || 'admin@crypxpro.com';
+      const outcomeText = outcome === 'win' ? 'FORCE_WIN' : outcome === 'loss' ? 'FORCE_LOSS' : 'NORMAL_CALCULATION';
+      
+      recordActivityLog({
+        category: 'MARKET_PARAMS',
+        action: outcome === 'normal' ? 'FUTURES_OUTCOME_RESET' : 'FUTURES_WIN_LOSS_OVERRIDE',
+        adminEmail,
+        target: targetUser?.email || targetUser?.ftid || userId,
+        title: outcome === 'normal' ? 'Reset Futures Market Override' : `Set Futures Outcome to ${outcomeText}`,
+        details: `Adjusted futures outcome setting to ${outcomeText} for user ${targetUser?.email || targetUser?.username || userId} (FTID: ${targetUser?.ftid || 'N/A'})`,
+        severity: outcome === 'normal' ? 'info' : 'warning',
+        metadata: {
+          userId,
+          userEmail: targetUser?.email,
+          username: targetUser?.username,
+          ftid: targetUser?.ftid,
+          outcome: outcomeText
+        }
+      });
     } catch (err: any) {
       console.error("Update error:", err);
       loadUsers(true);
@@ -97,6 +118,24 @@ const FuturesControl = () => {
     try {
       const { error: updateError } = await supabase.from('profiles').update(updates).eq('id', user.id);
       if (updateError) throw updateError;
+
+      const adminEmail = currentUser?.email || 'admin@crypxpro.com';
+      recordActivityLog({
+        category: 'MARKET_PARAMS',
+        action: 'FUTURES_WIN_LOSS_OVERRIDE',
+        adminEmail,
+        target: user.email || user.ftid || user.id,
+        title: isTurningOn ? 'Enabled Futures Force Win' : 'Disabled Futures Override',
+        details: `Toggled futures override to ${isTurningOn ? 'FORCE_WIN (Active)' : 'Disabled (Normal)'} for user ${user.email || user.username || user.id}`,
+        severity: isTurningOn ? 'warning' : 'info',
+        metadata: {
+          userId: user.id,
+          userEmail: user.email,
+          username: user.username,
+          ftid: user.ftid,
+          force_win: isTurningOn
+        }
+      });
     } catch (err: any) {
       console.error("Toggle error:", err);
       loadUsers(true);

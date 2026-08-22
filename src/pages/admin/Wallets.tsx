@@ -9,6 +9,7 @@ import {
   saveAdminWalletToSupabase,
   deleteAdminWalletFromSupabase
 } from '@/lib/adminPermissions';
+import { recordActivityLog } from '@/services/systemActivityLog';
 import { CryptoIcon } from '@/components/shared/CryptoIcon';
 import { toast } from 'sonner';
 import { Search, CheckCircle, AlertTriangle, Settings, Copy, RefreshCw, AlertCircle } from 'lucide-react';
@@ -105,18 +106,54 @@ const AdminWallets = () => {
           filtered.push(newWalletPayload);
           saveAdminWallets(filtered);
           await saveAdminWalletToSupabase(newWalletPayload);
+
+          recordActivityLog({
+            category: 'DEPOSIT_WALLET',
+            action: 'DEPOSIT_WALLET_UPDATED',
+            adminEmail: user?.email || 'admin@crypxpro.com',
+            adminId,
+            target: `${wallet.symbol} (${wallet.network})`,
+            title: `Updated Group Deposit Wallet Address (${adminId})`,
+            details: `Configured deposit address for ${wallet.symbol} on ${wallet.network} network: ${trimAddress}`,
+            severity: 'info',
+            metadata: {
+              symbol: wallet.symbol,
+              network: wallet.network,
+              walletAddress: trimAddress,
+              adminId,
+              scope: 'GROUP'
+            }
+          });
         } else {
           saveAdminWallets(filtered);
           await deleteAdminWalletFromSupabase(adminId, wallet.symbol, wallet.network);
+
+          recordActivityLog({
+            category: 'DEPOSIT_WALLET',
+            action: 'DEPOSIT_WALLET_REMOVED',
+            adminEmail: user?.email || 'admin@crypxpro.com',
+            adminId,
+            target: `${wallet.symbol} (${wallet.network})`,
+            title: `Cleared Group Deposit Wallet Address (${adminId})`,
+            details: `Removed custom deposit address for ${wallet.symbol} on ${wallet.network} network`,
+            severity: 'warning',
+            metadata: {
+              symbol: wallet.symbol,
+              network: wallet.network,
+              adminId,
+              scope: 'GROUP'
+            }
+          });
         }
         setWallets(prev => prev.map((w, i) => i === idx ? { ...w, id: adminId } : w));
         toast.success(`${wallet.symbol} (${wallet.network}) custom wallet updated successfully.`);
       } else {
         // Save global wallets
+        const trimAddress = wallet.address.trim();
         if (wallet.id) {
           // Update
           await supabase.from('admin_wallets')
-            .update({ address: wallet.address })
+            .update({ address: trimAddress })
             .eq('id', wallet.id);
         } else {
           // Insert
@@ -124,7 +161,7 @@ const AdminWallets = () => {
             .insert({
               symbol: wallet.symbol,
               network: wallet.network,
-              address: wallet.address
+              address: trimAddress
             })
             .select()
             .single();
@@ -133,6 +170,26 @@ const AdminWallets = () => {
             setWallets(prev => prev.map((w, i) => i === idx ? { ...w, id: data.id } : w));
           }
         }
+
+        recordActivityLog({
+          category: 'DEPOSIT_WALLET',
+          action: trimAddress ? 'DEPOSIT_WALLET_UPDATED' : 'DEPOSIT_WALLET_REMOVED',
+          adminEmail: user?.email || 'admin@crypxpro.com',
+          adminId: 'GLOBAL',
+          target: `${wallet.symbol} (${wallet.network})`,
+          title: trimAddress ? `Updated Global Deposit Wallet Address` : `Cleared Global Deposit Wallet Address`,
+          details: trimAddress 
+            ? `Configured global system deposit address for ${wallet.symbol} on ${wallet.network}: ${trimAddress}`
+            : `Cleared global deposit address for ${wallet.symbol} on ${wallet.network}`,
+          severity: trimAddress ? 'info' : 'warning',
+          metadata: {
+            symbol: wallet.symbol,
+            network: wallet.network,
+            walletAddress: trimAddress,
+            scope: 'GLOBAL'
+          }
+        });
+
         toast.success(`${wallet.symbol} (${wallet.network}) system wallet updated successfully.`);
       }
     } catch (e: any) {
